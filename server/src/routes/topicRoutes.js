@@ -9,9 +9,45 @@ import {
   BUCKET_PDFS,
   BUCKET_AUDIO,
 } from '../gridfsStorage.js';
+import {
+  uploadPdfBuffer,
+  uploadAudioBuffer,
+  destroyCloudinaryAsset,
+} from '../cloudinaryStorage.js';
+import { useCloudinary, useGridfs } from '../uploadDriver.js';
 
-const useGridfs = () => process.env.UPLOAD_DRIVER === 'gridfs';
-const topicUpload = () => (useGridfs() ? uploadTopicFilesMemory : uploadTopicFiles);
+const topicUpload = () =>
+  useCloudinary() || useGridfs() ? uploadTopicFilesMemory : uploadTopicFiles;
+
+async function wipePdf(topic) {
+  if (topic.pdfFileId) await deleteGridFile(BUCKET_PDFS, topic.pdfFileId);
+  if (topic.pdfRemotePublicId) await destroyCloudinaryAsset(topic.pdfRemotePublicId, 'raw');
+}
+
+async function wipeAudio(topic) {
+  if (topic.audioFileId) await deleteGridFile(BUCKET_AUDIO, topic.audioFileId);
+  if (topic.audioRemotePublicId) {
+    await destroyCloudinaryAsset(
+      topic.audioRemotePublicId,
+      topic.audioRemoteResourceType === 'raw' ? 'raw' : 'video'
+    );
+  }
+}
+
+function clearPdfFields(topic) {
+  topic.pdfFilename = null;
+  topic.pdfFileId = null;
+  topic.pdfRemoteUrl = null;
+  topic.pdfRemotePublicId = null;
+}
+
+function clearAudioFields(topic) {
+  topic.audioFilename = null;
+  topic.audioFileId = null;
+  topic.audioRemoteUrl = null;
+  topic.audioRemotePublicId = null;
+  topic.audioRemoteResourceType = null;
+}
 
 export function topicRoutes(baseUrl) {
   const router = Router();
@@ -58,10 +94,25 @@ export function topicRoutes(baseUrl) {
 
       let pdfFilename = null;
       let pdfFileId = null;
+      let pdfRemoteUrl = null;
+      let pdfRemotePublicId = null;
       let audioFilename = null;
       let audioFileId = null;
+      let audioRemoteUrl = null;
+      let audioRemotePublicId = null;
+      let audioRemoteResourceType = null;
 
-      if (useGridfs()) {
+      if (useCloudinary()) {
+        const pdfUp = await uploadPdfBuffer(pdfFile.buffer, pdfFile.originalname);
+        pdfRemoteUrl = pdfUp.secureUrl;
+        pdfRemotePublicId = pdfUp.publicId;
+        if (audioFile) {
+          const aUp = await uploadAudioBuffer(audioFile.buffer, audioFile.originalname);
+          audioRemoteUrl = aUp.secureUrl;
+          audioRemotePublicId = aUp.publicId;
+          audioRemoteResourceType = aUp.resourceType;
+        }
+      } else if (useGridfs()) {
         pdfFileId = await uploadBufferToGridFS(
           BUCKET_PDFS,
           pdfFile.buffer,
@@ -93,8 +144,13 @@ export function topicRoutes(baseUrl) {
         slug,
         pdfFilename,
         pdfFileId,
+        pdfRemoteUrl,
+        pdfRemotePublicId,
         audioFilename,
         audioFileId,
+        audioRemoteUrl,
+        audioRemotePublicId,
+        audioRemoteResourceType,
         sortOrder: sortOrder != null ? Number(sortOrder) : 0,
         isPublished: isPublished === 'true' || isPublished === true,
       });
@@ -119,34 +175,41 @@ export function topicRoutes(baseUrl) {
 
       if (files.pdf?.[0]) {
         const p = files.pdf[0];
-        if (topic.pdfFileId) await deleteGridFile(BUCKET_PDFS, topic.pdfFileId);
-        if (useGridfs()) {
+        await wipePdf(topic);
+        clearPdfFields(topic);
+        if (useCloudinary()) {
+          const up = await uploadPdfBuffer(p.buffer, p.originalname);
+          topic.pdfRemoteUrl = up.secureUrl;
+          topic.pdfRemotePublicId = up.publicId;
+        } else if (useGridfs()) {
           topic.pdfFileId = await uploadBufferToGridFS(
             BUCKET_PDFS,
             p.buffer,
             p.originalname,
             p.mimetype || 'application/pdf'
           );
-          topic.pdfFilename = null;
         } else {
           topic.pdfFilename = p.filename;
-          topic.pdfFileId = null;
         }
       }
       if (files.audio?.[0]) {
         const a = files.audio[0];
-        if (topic.audioFileId) await deleteGridFile(BUCKET_AUDIO, topic.audioFileId);
-        if (useGridfs()) {
+        await wipeAudio(topic);
+        clearAudioFields(topic);
+        if (useCloudinary()) {
+          const up = await uploadAudioBuffer(a.buffer, a.originalname);
+          topic.audioRemoteUrl = up.secureUrl;
+          topic.audioRemotePublicId = up.publicId;
+          topic.audioRemoteResourceType = up.resourceType;
+        } else if (useGridfs()) {
           topic.audioFileId = await uploadBufferToGridFS(
             BUCKET_AUDIO,
             a.buffer,
             a.originalname,
             a.mimetype || 'audio/mpeg'
           );
-          topic.audioFilename = null;
         } else {
           topic.audioFilename = a.filename;
-          topic.audioFileId = null;
         }
       }
 
@@ -166,8 +229,8 @@ export function topicRoutes(baseUrl) {
     try {
       const topic = await Topic.findById(req.params.id);
       if (!topic) return res.status(404).json({ error: 'Topic not found' });
-      await deleteGridFile(BUCKET_PDFS, topic.pdfFileId);
-      await deleteGridFile(BUCKET_AUDIO, topic.audioFileId);
+      await wipePdf(topic);
+      await wipeAudio(topic);
       await topic.deleteOne();
       res.status(204).send();
     } catch (e) {

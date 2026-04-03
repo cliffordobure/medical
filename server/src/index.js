@@ -11,6 +11,8 @@ import { topicRoutes } from './routes/topicRoutes.js';
 import { paymentRouter, paystackWebhookHandler } from './routes/paymentRoutes.js';
 import { ensureUploadsDir } from './middleware/upload.js';
 import { runSeed } from './seed.js';
+import { configureCloudinary } from './cloudinaryStorage.js';
+import { getUploadDriver } from './uploadDriver.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT) || 5000;
@@ -30,11 +32,14 @@ async function main() {
   await runSeed();
   ensureUploadsDir();
 
-  const uploadDriver = process.env.UPLOAD_DRIVER || 'disk';
-  if (uploadDriver === 'gridfs') {
-    console.log('File storage: MongoDB GridFS (survives Render restarts — re-upload old disk-only PDFs once).');
+  const uploadDriver = getUploadDriver();
+  if (uploadDriver === 'cloudinary') {
+    configureCloudinary();
+    console.log('[uploads] Cloudinary — new admin uploads go to CDN (check pdfRemoteUrl in MongoDB).');
+  } else if (uploadDriver === 'gridfs') {
+    console.log('[uploads] GridFS — new uploads store pdfFileId / audioFileId in MongoDB.');
   } else {
-    console.log('File storage: local disk (uploads/ — not persistent on Render without a disk mount).');
+    console.log('[uploads] Local disk — MongoDB will show pdfFilename / audioFilename (not Cloudinary).');
   }
 
   const app = express();
