@@ -2,6 +2,11 @@ import mongoose from 'mongoose';
 
 const topicSchema = new mongoose.Schema(
   {
+    /** 1–6 = year of study; used for grouping in the app. */
+    yearOfStudy: { type: Number, default: 1, min: 1, max: 6 },
+    /** Subject / module name (middle level: Year → this → subtopic title). */
+    topicGroup: { type: String, default: 'General', trim: true },
+    /** Subtopic / lesson title (leaf). */
     title: { type: String, required: true, trim: true },
     description: { type: String, default: '' },
     slug: { type: String, required: true, unique: true, lowercase: true, trim: true },
@@ -24,8 +29,12 @@ const topicSchema = new mongoose.Schema(
 );
 
 topicSchema.methods.toListJSON = function toListJSON(baseUrl) {
+  const y = Number.isFinite(this.yearOfStudy) ? this.yearOfStudy : 1;
+  const grp = (this.topicGroup && String(this.topicGroup).trim()) || 'General';
   return {
     id: this._id.toString(),
+    yearOfStudy: y,
+    topic: grp,
     title: this.title,
     description: this.description,
     slug: this.slug,

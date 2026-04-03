@@ -98,6 +98,10 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
     }
     final t = _topic!;
     final title = t['title'] as String? ?? '';
+    final year = (t['yearOfStudy'] as num?)?.toInt() ?? 1;
+    final topicLine = ((t['topic'] as String?) ?? '').trim();
+    final topicLabel = topicLine.isEmpty ? 'General' : topicLine;
+    final breadcrumb = 'Year $year · $topicLabel';
     final pdfUrl = t['pdfUrl'] as String?;
     final audioUrl = t['audioUrl'] as String?;
 
@@ -112,7 +116,33 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
             icon: const Icon(Icons.arrow_back_ios_new_rounded),
             onPressed: () => Navigator.pop(context),
           ),
-          title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                breadcrumb,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: AppColors.textMuted,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.2,
+                ),
+              ),
+              Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
           flexibleSpace: Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
@@ -448,7 +478,7 @@ class _AudioPaneState extends State<_AudioPane> {
           tag: MediaItem(
             id: url,
             title: widget.title,
-            artist: 'MedStudy',
+            artist: 'Medical Audios',
           ),
         ),
       );

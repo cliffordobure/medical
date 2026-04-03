@@ -43,6 +43,8 @@ export type User = {
 
 export type TopicList = {
   id: string
+  yearOfStudy?: number
+  topic?: string
   title: string
   description: string
   slug: string
@@ -115,9 +117,19 @@ export type PackageInfo = {
   intervalMonths: number
 }
 
+/** [amountKobo] = Paystack minor units (KES cents or NGN kobo). */
+export function formatMinorAmount(minor: number, currency: string): string {
+  const major = minor / 100
+  const c = (currency || 'KES').toUpperCase()
+  if (c === 'KES') return `Ksh ${major.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+  if (c === 'NGN') return `₦${major.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+  return `${c} ${major.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+}
+
 export async function fetchPackages() {
   const { data } = await api.get<{
     paystackPublicKey: string
+    currency: string
     packages: PackageInfo[]
   }>('/packages')
   return data
@@ -148,8 +160,8 @@ export type AdminPackage = {
 }
 
 export async function adminListPackages() {
-  const { data } = await api.get<{ packages: AdminPackage[] }>('/admin/packages')
-  return data.packages
+  const { data } = await api.get<{ packages: AdminPackage[]; currency: string }>('/admin/packages')
+  return data
 }
 
 export async function adminCreatePackage(body: {

@@ -61,6 +61,21 @@ class ApiClient {
     }
   }
 
+  /// Parses server `{ "error": "..." }` and common status codes for subscribe / pay flows.
+  static String dioErrorMessage(Object e, {String fallback = 'Request failed'}) {
+    if (e is DioException) {
+      final data = e.response?.data;
+      if (data is Map && data['error'] is String) {
+        return data['error'] as String;
+      }
+      final code = e.response?.statusCode;
+      if (code == 401) return 'Log in as a student to subscribe.';
+      if (code == 403) return 'Only student accounts can purchase Premium.';
+      if (e.message != null && e.message!.isNotEmpty) return e.message!;
+    }
+    return fallback;
+  }
+
   /// User-facing hint when requests fail (same base as [AppConfig.apiBase]).
   static String connectionHint(Object? error) {
     final base = AppConfig.apiBase;

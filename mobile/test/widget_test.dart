@@ -5,7 +5,7 @@ import 'package:medical_students_app/main.dart';
 
 void main() {
   testWidgets('App builds', (WidgetTester tester) async {
-    await tester.pumpWidget(const MedStudyApp());
+    await tester.pumpWidget(const MedicalAudiosApp());
     await tester.pump();
     expect(find.byType(MaterialApp), findsOneWidget);
   });

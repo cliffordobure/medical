@@ -1,17 +1,27 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { fetchPackages, initializePayment, type PackageInfo } from '../lib/api'
+import {
+  fetchPackages,
+  formatApiError,
+  formatMinorAmount,
+  initializePayment,
+  type PackageInfo,
+} from '../lib/api'
 import { useAuth } from '../context/AuthContext'
 
 export function Subscribe() {
   const { user } = useAuth()
   const [packages, setPackages] = useState<PackageInfo[]>([])
+  const [currency, setCurrency] = useState('KES')
   const [error, setError] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
 
   useEffect(() => {
     fetchPackages()
-      .then((d) => setPackages(d.packages))
+      .then((d) => {
+        setPackages(d.packages)
+        setCurrency((d.currency || 'KES').toUpperCase())
+      })
       .catch(() => setError('Could not load packages.'))
   }, [])
 
@@ -29,8 +39,8 @@ export function Subscribe() {
     try {
       const { authorizationUrl } = await initializePayment(pkg.id)
       window.location.href = authorizationUrl
-    } catch {
-      setError('Could not start payment. Check Paystack keys on the server.')
+    } catch (err) {
+      setError(formatApiError(err, 'Could not start payment. Check Paystack keys and PAYSTACK_CURRENCY on the server.'))
     } finally {
       setBusyId(null)
     }
@@ -68,8 +78,8 @@ export function Subscribe() {
     <div>
       <h1 className="text-2xl font-semibold">Premium</h1>
       <p className="mt-2 max-w-xl text-slate-600">
-        Remove ads while reading and listening. Pay securely with Paystack (NGN). Amounts are seeded on the server —
-        adjust in MongoDB if needed.
+        Remove ads while reading and listening. Pay securely with Paystack ({currency}). Prices use minor units on the
+        server — adjust in Admin → Packages if needed.
       </p>
       {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
       <ul className="mt-8 grid gap-4 sm:grid-cols-2">
@@ -78,7 +88,7 @@ export function Subscribe() {
             <h2 className="font-semibold text-slate-900">{p.displayName}</h2>
             {p.description && <p className="mt-2 text-sm text-slate-600">{p.description}</p>}
             <p className="mt-4 text-lg font-medium text-slate-900">
-              ₦{(p.amountKobo / 100).toLocaleString()}
+              {formatMinorAmount(p.amountKobo, currency)}
               <span className="text-sm font-normal text-slate-500">
                 {' '}
                 / {p.intervalMonths === 12 ? 'year' : `${p.intervalMonths} mo`}

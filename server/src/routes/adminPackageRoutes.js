@@ -2,6 +2,10 @@ import { Router } from 'express';
 import { SubscriptionPackage } from '../models/SubscriptionPackage.js';
 import { authRequired, loadUser, adminOnly } from '../middleware/auth.js';
 
+function paymentCurrency() {
+  return (process.env.PAYSTACK_CURRENCY || 'KES').trim().toUpperCase();
+}
+
 export function adminPackageRoutes() {
   const router = Router();
   const admin = Router();
@@ -11,6 +15,7 @@ export function adminPackageRoutes() {
     try {
       const packages = await SubscriptionPackage.find().sort({ intervalMonths: 1, displayName: 1 });
       res.json({
+        currency: paymentCurrency(),
         packages: packages.map((p) => ({
           id: p._id.toString(),
           key: p.key,

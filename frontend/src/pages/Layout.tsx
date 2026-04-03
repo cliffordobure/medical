@@ -9,12 +9,12 @@ export function Layout() {
     <div className="min-h-screen bg-slate-50 text-slate-900">
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-4">
-          <Link to="/" className="text-lg font-semibold text-teal-700">
-            MedStudy
+          <Link to="/" className="text-lg font-semibold tracking-tight text-teal-700">
+            Medical Audios
           </Link>
           <nav className="flex flex-wrap items-center gap-3 text-sm">
             <Link to="/" className="text-slate-600 hover:text-slate-900">
-              Topics
+              Library
             </Link>
             {user?.role === 'student' && (
               <Link to="/subscribe" className="text-slate-600 hover:text-slate-900">

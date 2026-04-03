@@ -33,7 +33,7 @@ export function AdminDashboard() {
   return (
     <div>
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <h1 className="text-2xl font-semibold">Admin — Topics</h1>
+        <h1 className="text-2xl font-semibold">Admin — Lessons</h1>
         <div className="flex flex-wrap gap-2">
           <Link
             to="/admin/packages"
@@ -51,7 +51,7 @@ export function AdminDashboard() {
             to="/admin/new"
             className="rounded-xl bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700"
           >
-            New topic
+            New lesson
           </Link>
         </div>
       </div>
@@ -65,7 +65,8 @@ export function AdminDashboard() {
             <div>
               <p className="font-medium text-slate-900">{t.title}</p>
               <p className="text-xs text-slate-500">
-                /topics/{t.slug} · {t.isPublished ? 'Published' : 'Draft'}
+                Year {typeof t.yearOfStudy === 'number' ? t.yearOfStudy : 1} · {(t.topic && t.topic.trim()) || 'General'}{' '}
+                · /topics/{t.slug} · {t.isPublished ? 'Published' : 'Draft'}
               </p>
             </div>
             <div className="flex gap-2">

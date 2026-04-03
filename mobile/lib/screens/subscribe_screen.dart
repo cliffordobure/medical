@@ -17,9 +17,22 @@ class SubscribeScreen extends StatefulWidget {
 
 class _SubscribeScreenState extends State<SubscribeScreen> {
   List<dynamic> _packages = [];
+  String _currency = 'KES';
   String? _error;
   bool _loading = true;
   final _ref = TextEditingController();
+
+  String _formatPrice(int minor, String currency) {
+    final major = minor / 100.0;
+    switch (currency.toUpperCase()) {
+      case 'KES':
+        return 'Ksh ${major.toStringAsFixed(0)}';
+      case 'NGN':
+        return '₦${major.toStringAsFixed(0)}';
+      default:
+        return '$currency ${major.toStringAsFixed(2)}';
+    }
+  }
 
   @override
   void initState() {
@@ -39,8 +52,10 @@ class _SubscribeScreenState extends State<SubscribeScreen> {
       if (!mounted) return;
       final data = await widget.api.fetchPackages();
       final list = data['packages'] as List<dynamic>? ?? [];
+      final cur = ((data['currency'] as String?) ?? 'KES').toUpperCase();
       setState(() {
         _packages = list;
+        _currency = cur;
         _error = null;
       });
     } catch (e) {
@@ -62,8 +77,13 @@ class _SubscribeScreenState extends State<SubscribeScreen> {
       if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
         setState(() => _error = 'Could not open browser.');
       }
-    } catch (_) {
-      setState(() => _error = 'Payment start failed. Log in as a student and check Paystack keys.');
+    } catch (e) {
+      setState(() {
+        _error = ApiClient.dioErrorMessage(
+          e,
+          fallback: 'Payment start failed. Log in as a student and check Paystack keys.',
+        );
+      });
     }
   }
 
@@ -79,8 +99,10 @@ class _SubscribeScreenState extends State<SubscribeScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Premium activated')),
       );
-    } catch (_) {
-      setState(() => _error = 'Verification failed. Check reference.');
+    } catch (e) {
+      setState(() {
+        _error = ApiClient.dioErrorMessage(e, fallback: 'Verification failed. Check reference.');
+      });
     }
   }
 
@@ -113,12 +135,12 @@ class _SubscribeScreenState extends State<SubscribeScreen> {
                       end: Alignment.bottomRight,
                     ),
                   ),
-                  child: const Column(
+                  child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(Icons.workspace_premium_rounded, color: AppColors.spotifyGreen, size: 36),
-                      SizedBox(height: 12),
-                      Text(
+                      const Icon(Icons.workspace_premium_rounded, color: AppColors.spotifyGreen, size: 36),
+                      const SizedBox(height: 12),
+                      const Text(
                         'Study without interruptions',
                         style: TextStyle(
                           color: AppColors.textPrimary,
@@ -127,10 +149,10 @@ class _SubscribeScreenState extends State<SubscribeScreen> {
                           letterSpacing: -0.5,
                         ),
                       ),
-                      SizedBox(height: 8),
+                      const SizedBox(height: 8),
                       Text(
-                        'Remove ads on PDFs and audio. Pay securely with Paystack.',
-                        style: TextStyle(color: AppColors.textSecondary, height: 1.4),
+                        'Remove ads on PDFs and audio. Pay securely with Paystack ($_currency).',
+                        style: const TextStyle(color: AppColors.textSecondary, height: 1.4),
                       ),
                     ],
                   ),
@@ -211,7 +233,7 @@ class _SubscribeScreenState extends State<SubscribeScreen> {
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
-                                      '₦${(kobo / 100).toStringAsFixed(0)}',
+                                      _formatPrice(kobo, _currency),
                                       style: const TextStyle(
                                         color: AppColors.spotifyGreen,
                                         fontWeight: FontWeight.w900,

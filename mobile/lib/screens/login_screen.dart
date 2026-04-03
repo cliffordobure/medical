@@ -88,7 +88,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         const SizedBox(height: 8),
                         Text(
                           _register
-                              ? 'Start learning with MedStudy.'
+                              ? 'Start learning with Medical Audios.'
                               : 'Log in to sync Premium and progress.',
                           style: TextStyle(
                             color: Colors.black.withValues(alpha: 0.65),

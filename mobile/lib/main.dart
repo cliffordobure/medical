@@ -9,20 +9,20 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await JustAudioBackground.init(
     androidNotificationChannelId: 'com.medicalstudents.medical_students_app.audio',
-    androidNotificationChannelName: 'MedStudy audio',
+    androidNotificationChannelName: 'Medical Audios',
     androidNotificationOngoing: true,
   );
-  runApp(const MedStudyApp());
+  runApp(const MedicalAudiosApp());
 }
 
-class MedStudyApp extends StatefulWidget {
-  const MedStudyApp({super.key});
+class MedicalAudiosApp extends StatefulWidget {
+  const MedicalAudiosApp({super.key});
 
   @override
-  State<MedStudyApp> createState() => _MedStudyAppState();
+  State<MedicalAudiosApp> createState() => _MedicalAudiosAppState();
 }
 
-class _MedStudyAppState extends State<MedStudyApp> {
+class _MedicalAudiosAppState extends State<MedicalAudiosApp> {
   final ApiClient _api = ApiClient();
   Map<String, dynamic>? _user;
   bool _boot = true;
@@ -56,7 +56,7 @@ class _MedStudyAppState extends State<MedStudyApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'MedStudy',
+      title: 'Medical Audios',
       theme: buildMedStudyTheme(),
       themeMode: ThemeMode.dark,
       debugShowCheckedModeBanner: false,

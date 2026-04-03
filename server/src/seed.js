@@ -10,6 +10,7 @@ export async function runSeed() {
         key: 'premium_monthly',
         displayName: 'Premium — Monthly',
         description: 'Unlimited study materials without ads.',
+        // Minor units: KES cents (100 = 1 Ksh) when PAYSTACK_CURRENCY=KES; same field for NGN kobo.
         amountKobo: 500000,
         intervalMonths: 1,
         active: true,
@@ -23,7 +24,7 @@ export async function runSeed() {
         active: true,
       },
     ]);
-    console.log('Seeded subscription packages (adjust amounts in MongoDB if needed).');
+    console.log('Seeded subscription packages (amountKobo = minor units; default currency KES on server).');
   }
 
   const adminEmail = process.env.SEED_ADMIN_EMAIL;

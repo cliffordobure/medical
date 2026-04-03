@@ -5,11 +5,13 @@ import {
   adminDeletePackage,
   adminListPackages,
   adminUpdatePackage,
+  formatMinorAmount,
   type AdminPackage,
 } from '../lib/api'
 
 export function AdminPackages() {
   const [packages, setPackages] = useState<AdminPackage[]>([])
+  const [currency, setCurrency] = useState('KES')
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
@@ -17,14 +19,16 @@ export function AdminPackages() {
     key: '',
     displayName: '',
     description: '',
-    amountNaira: '',
+    amountKsh: '',
     intervalMonths: '1',
     active: true,
   })
 
   async function load() {
     try {
-      setPackages(await adminListPackages())
+      const data = await adminListPackages()
+      setPackages(data.packages)
+      setCurrency((data.currency || 'KES').toUpperCase())
       setError(null)
     } catch {
       setError('Failed to load packages.')
@@ -37,9 +41,9 @@ export function AdminPackages() {
 
   async function create(e: React.FormEvent) {
     e.preventDefault()
-    const naira = Number(form.amountNaira)
-    if (!form.key.trim() || !form.displayName.trim() || !Number.isFinite(naira) || naira <= 0) {
-      setError('Fill key, name, and a valid amount (NGN).')
+    const ksh = Number(form.amountKsh)
+    if (!form.key.trim() || !form.displayName.trim() || !Number.isFinite(ksh) || ksh <= 0) {
+      setError(`Fill key, name, and a valid whole amount (${currency === 'NGN' ? 'NGN' : 'Ksh'}).`)
       return
     }
     setSaving(true)
@@ -48,7 +52,7 @@ export function AdminPackages() {
         key: form.key.trim(),
         displayName: form.displayName.trim(),
         description: form.description.trim(),
-        amountKobo: Math.round(naira * 100),
+        amountKobo: Math.round(ksh * 100),
         intervalMonths: Number(form.intervalMonths) || 1,
         active: form.active,
       })
@@ -56,7 +60,7 @@ export function AdminPackages() {
         key: '',
         displayName: '',
         description: '',
-        amountNaira: '',
+        amountKsh: '',
         intervalMonths: '1',
         active: true,
       })
@@ -137,14 +141,14 @@ export function AdminPackages() {
         </label>
         <div className="grid gap-3 sm:grid-cols-3">
           <label className="block text-sm">
-            <span className="text-slate-600">Price (NGN)</span>
+            <span className="text-slate-600">Price (whole {currency === 'NGN' ? 'NGN' : 'Ksh'})</span>
             <input
               type="number"
               min={1}
               step={1}
               className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2"
-              value={form.amountNaira}
-              onChange={(e) => setForm((f) => ({ ...f, amountNaira: e.target.value }))}
+              value={form.amountKsh}
+              onChange={(e) => setForm((f) => ({ ...f, amountKsh: e.target.value }))}
               required
             />
           </label>
@@ -187,7 +191,7 @@ export function AdminPackages() {
             <div>
               <p className="font-medium text-slate-900">{p.displayName}</p>
               <p className="text-xs text-slate-500">
-                {p.key} · ₦{(p.amountKobo / 100).toLocaleString()} / {p.intervalMonths} mo ·{' '}
+                {p.key} · {formatMinorAmount(p.amountKobo, currency)} / {p.intervalMonths} mo ·{' '}
                 {p.active ? 'Active' : 'Hidden'}
               </p>
             </div>

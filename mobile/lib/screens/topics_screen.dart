@@ -7,6 +7,30 @@ import 'login_screen.dart';
 import 'subscribe_screen.dart';
 import 'topic_detail_screen.dart';
 
+int _topicYear(Map<String, dynamic> t) => (t['yearOfStudy'] as num?)?.toInt() ?? 1;
+
+String _topicModule(Map<String, dynamic> t) {
+  final s = (t['topic'] as String?)?.trim();
+  return (s == null || s.isEmpty) ? 'General' : s;
+}
+
+int _topicCompare(Map<String, dynamic> a, Map<String, dynamic> b) {
+  final cy = _topicYear(a).compareTo(_topicYear(b));
+  if (cy != 0) return cy;
+  final ct = _topicModule(a).compareTo(_topicModule(b));
+  if (ct != 0) return ct;
+  final sa = (a['sortOrder'] as num?)?.toInt() ?? 0;
+  final sb = (b['sortOrder'] as num?)?.toInt() ?? 0;
+  if (sa != sb) return sa.compareTo(sb);
+  return (a['title'] as String? ?? '').compareTo(b['title'] as String? ?? '');
+}
+
+List<Map<String, dynamic>> _sortedTopics(Iterable<Map<String, dynamic>> items) {
+  final list = items.toList();
+  list.sort(_topicCompare);
+  return list;
+}
+
 class TopicsScreen extends StatefulWidget {
   const TopicsScreen({
     super.key,
@@ -93,8 +117,58 @@ class _TopicsScreenState extends State<TopicsScreen> {
     return list.where((t) {
       final title = (t['title'] as String? ?? '').toLowerCase();
       final desc = (t['description'] as String? ?? '').toLowerCase();
-      return title.contains(q) || desc.contains(q);
+      final mod = _topicModule(t).toLowerCase();
+      final yearStr = '${_topicYear(t)}';
+      return title.contains(q) || desc.contains(q) || mod.contains(q) || yearStr.contains(q);
     });
+  }
+
+  List<Map<String, dynamic>> get _filteredSorted => _sortedTopics(_filteredTopics);
+
+  List<Widget> _buildLessonRows(BuildContext context, bool premium) {
+    final list = _filteredSorted;
+    final out = <Widget>[];
+    int? lastYear;
+    String? lastModule;
+    for (final t in list) {
+      final y = _topicYear(t);
+      final m = _topicModule(t);
+      if (y != lastYear) {
+        out.add(_YearSectionLabel(year: y));
+        lastYear = y;
+        lastModule = null;
+      }
+      if (m != lastModule) {
+        out.add(_ModuleSectionLabel(title: m));
+        lastModule = m;
+      }
+      final slug = t['slug'] as String;
+      out.add(
+        Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: _TopicTileCard(
+            title: t['title'] as String? ?? '',
+            description: t['description'] as String? ?? '',
+            hasPdf: t['hasPdf'] == true,
+            hasAudio: t['hasAudio'] == true,
+            onTap: () {
+              Navigator.push<void>(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => TopicDetailScreen(
+                    api: widget.api,
+                    slug: slug,
+                    premium: premium,
+                    onPremiumChanged: widget.onAuthChanged,
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      );
+    }
+    return out;
   }
 
   Future<void> _openPremium() async {
@@ -155,6 +229,7 @@ class _TopicsScreenState extends State<TopicsScreen> {
   }
 
   Widget _buildHomeTab(BuildContext context, bool premium, bool student) {
+    final lessonRows = _buildLessonRows(context, premium);
     return RefreshIndicator(
       color: AppColors.spotifyGreen,
       onRefresh: _load,
@@ -176,7 +251,7 @@ class _TopicsScreenState extends State<TopicsScreen> {
                             '$_greeting,\n$_shortName',
                             style: const TextStyle(
                               color: Colors.black87,
-                              fontSize: 26,
+                              fontSize: 24,
                               fontWeight: FontWeight.w900,
                               height: 1.15,
                               letterSpacing: -0.8,
@@ -211,6 +286,16 @@ class _TopicsScreenState extends State<TopicsScreen> {
                             ),
                           ),
                       ],
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      'Medical Audios',
+                      style: TextStyle(
+                        color: Colors.black.withValues(alpha: 0.42),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1.2,
+                      ),
                     ),
                   ],
                 ),
@@ -265,7 +350,7 @@ class _TopicsScreenState extends State<TopicsScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     const Text(
-                      'Your topics',
+                      'Library',
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w800,
@@ -273,7 +358,7 @@ class _TopicsScreenState extends State<TopicsScreen> {
                       ),
                     ),
                     Text(
-                      '${_filteredTopics.length} items',
+                      '${_filteredSorted.length} lessons',
                       style: const TextStyle(color: AppColors.textMuted, fontSize: 13),
                     ),
                   ],
@@ -282,38 +367,14 @@ class _TopicsScreenState extends State<TopicsScreen> {
             ),
             SliverToBoxAdapter(child: _featuredRow(context, premium)),
             SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 100),
               sliver: SliverList(
                 delegate: SliverChildBuilderDelegate(
                   (context, i) {
-                    final list = _filteredTopics.toList();
-                    if (i >= list.length) return null;
-                    final t = list[i];
-                    final slug = t['slug'] as String;
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: _TopicTileCard(
-                        title: t['title'] as String? ?? '',
-                        description: t['description'] as String? ?? '',
-                        hasPdf: t['hasPdf'] == true,
-                        hasAudio: t['hasAudio'] == true,
-                        onTap: () {
-                          Navigator.push<void>(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => TopicDetailScreen(
-                                api: widget.api,
-                                slug: slug,
-                                premium: premium,
-                                onPremiumChanged: widget.onAuthChanged,
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    );
+                    if (i >= lessonRows.length) return null;
+                    return lessonRows[i];
                   },
-                  childCount: _filteredTopics.length,
+                  childCount: lessonRows.length,
                 ),
               ),
             ),
@@ -324,7 +385,7 @@ class _TopicsScreenState extends State<TopicsScreen> {
   }
 
   Widget _featuredRow(BuildContext context, bool premium) {
-    final featured = _filteredTopics.take(6).toList();
+    final featured = _filteredSorted.take(6).toList();
     if (featured.isEmpty) return const SizedBox.shrink();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -332,9 +393,9 @@ class _TopicsScreenState extends State<TopicsScreen> {
         const Padding(
           padding: EdgeInsets.fromLTRB(16, 12, 16, 12),
           child: Text(
-            'Jump back in',
+            'Continue',
             style: TextStyle(
-              fontSize: 18,
+              fontSize: 16,
               fontWeight: FontWeight.w800,
               color: AppColors.textPrimary,
             ),
@@ -353,6 +414,7 @@ class _TopicsScreenState extends State<TopicsScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 4),
                 child: _FeaturedCard(
                   title: t['title'] as String? ?? '',
+                  subtitle: 'Y${_topicYear(t)} · ${_topicModule(t)}',
                   onTap: () {
                     Navigator.push<void>(
                       context,
@@ -376,7 +438,7 @@ class _TopicsScreenState extends State<TopicsScreen> {
   }
 
   Widget _buildSearchTab(BuildContext context, bool premium) {
-    final list = _filteredTopics.toList();
+    final rows = _buildLessonRows(context, premium);
     return Column(
       children: [
         Padding(
@@ -386,48 +448,22 @@ class _TopicsScreenState extends State<TopicsScreen> {
             onChanged: (_) => setState(() {}),
             style: const TextStyle(color: AppColors.textPrimary),
             decoration: const InputDecoration(
-              hintText: 'What do you want to study?',
+              hintText: 'Year, topic, or lesson',
               prefixIcon: Icon(Icons.search, color: AppColors.textMuted),
             ),
           ),
         ),
         Expanded(
-          child: list.isEmpty
+          child: rows.isEmpty
               ? const Center(
                   child: Text(
                     'No matches',
                     style: TextStyle(color: AppColors.textMuted),
                   ),
                 )
-              : ListView.builder(
+              : ListView(
                   padding: const EdgeInsets.all(16),
-                  itemCount: list.length,
-                  itemBuilder: (context, i) {
-                    final t = list[i];
-                    final slug = t['slug'] as String;
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: _TopicTileCard(
-                        title: t['title'] as String? ?? '',
-                        description: t['description'] as String? ?? '',
-                        hasPdf: t['hasPdf'] == true,
-                        hasAudio: t['hasAudio'] == true,
-                        onTap: () {
-                          Navigator.push<void>(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => TopicDetailScreen(
-                                api: widget.api,
-                                slug: slug,
-                                premium: premium,
-                                onPremiumChanged: widget.onAuthChanged,
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    );
-                  },
+                  children: rows,
                 ),
         ),
       ],
@@ -523,6 +559,63 @@ class _TopicsScreenState extends State<TopicsScreen> {
 
 enum _TopicFilter { all, pdf, audio }
 
+class _YearSectionLabel extends StatelessWidget {
+  const _YearSectionLabel({required this.year});
+
+  final int year;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 20, 4, 8),
+      child: Row(
+        children: [
+          Container(
+            width: 3,
+            height: 18,
+            decoration: BoxDecoration(
+              color: AppColors.spotifyGreen,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Text(
+            'YEAR $year',
+            style: const TextStyle(
+              color: AppColors.spotifyGreen,
+              fontSize: 12,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 1.4,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ModuleSectionLabel extends StatelessWidget {
+  const _ModuleSectionLabel({required this.title});
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 4, 4, 8),
+      child: Text(
+        title,
+        style: const TextStyle(
+          color: AppColors.textPrimary,
+          fontSize: 17,
+          fontWeight: FontWeight.w800,
+          letterSpacing: -0.3,
+        ),
+      ),
+    );
+  }
+}
+
 class _FilterChip extends StatelessWidget {
   const _FilterChip({required this.label, required this.selected, required this.onTap});
 
@@ -555,9 +648,10 @@ class _FilterChip extends StatelessWidget {
 }
 
 class _FeaturedCard extends StatelessWidget {
-  const _FeaturedCard({required this.title, required this.onTap});
+  const _FeaturedCard({required this.title, this.subtitle, required this.onTap});
 
   final String title;
+  final String? subtitle;
   final VoidCallback onTap;
 
   @override
@@ -590,16 +684,35 @@ class _FeaturedCard extends StatelessWidget {
               ),
               Padding(
                 padding: const EdgeInsets.all(10),
-                child: Text(
-                  title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: AppColors.textPrimary,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13,
-                    height: 1.2,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (subtitle != null && subtitle!.isNotEmpty) ...[
+                      Text(
+                        subtitle!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppColors.textMuted,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.2,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                    ],
+                    Text(
+                      title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                        height: 1.2,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],

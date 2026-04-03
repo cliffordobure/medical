@@ -55,7 +55,12 @@ export function topicRoutes(baseUrl) {
 
   router.get('/topics', async (_req, res, next) => {
     try {
-      const topics = await Topic.find({ isPublished: true }).sort({ sortOrder: 1, title: 1 });
+      const topics = await Topic.find({ isPublished: true }).sort({
+        yearOfStudy: 1,
+        topicGroup: 1,
+        sortOrder: 1,
+        title: 1,
+      });
       res.json({ topics: topics.map((t) => t.toListJSON(baseUrl)) });
     } catch (e) {
       next(e);
@@ -84,7 +89,12 @@ export function topicRoutes(baseUrl) {
 
   admin.get('/topics', async (_req, res, next) => {
     try {
-      const topics = await Topic.find().sort({ sortOrder: 1, title: 1 });
+      const topics = await Topic.find().sort({
+        yearOfStudy: 1,
+        topicGroup: 1,
+        sortOrder: 1,
+        title: 1,
+      });
       res.json({ topics: topics.map((t) => t.toDetailJSON(baseUrl)) });
     } catch (e) {
       next(e);
@@ -93,8 +103,14 @@ export function topicRoutes(baseUrl) {
 
   admin.post('/topics', topicUpload(), async (req, res, next) => {
     try {
-      const { title, description, isPublished, sortOrder } = req.body || {};
-      if (!title) return res.status(400).json({ error: 'Title is required' });
+      const { title, description, isPublished, sortOrder, yearOfStudy, topic: topicLabel, topicGroup } =
+        req.body || {};
+      if (!title) return res.status(400).json({ error: 'Subtopic title is required' });
+      const y = yearOfStudy != null && yearOfStudy !== '' ? Number(yearOfStudy) : 1;
+      const safeYear = Number.isFinite(y) && y >= 1 && y <= 6 ? y : 1;
+      const groupRaw =
+        topicLabel != null && topicLabel !== '' ? String(topicLabel) : String(topicGroup || 'General');
+      const group = groupRaw.trim() || 'General';
       const files = req.files || {};
       const pdfFile = files.pdf?.[0];
       if (!pdfFile) return res.status(400).json({ error: 'PDF file is required' });
@@ -146,7 +162,9 @@ export function topicRoutes(baseUrl) {
         n += 1;
         slug = `${slugify(title)}-${n}`;
       }
-      const topic = await Topic.create({
+      const created = await Topic.create({
+        yearOfStudy: safeYear,
+        topicGroup: group,
         title: String(title).trim(),
         description: String(description || ''),
         slug,
@@ -162,8 +180,8 @@ export function topicRoutes(baseUrl) {
         sortOrder: sortOrder != null ? Number(sortOrder) : 0,
         isPublished: isPublished === 'true' || isPublished === true,
       });
-      logTopicSaved('admin_topic_created', topic);
-      res.status(201).json({ topic: topic.toDetailJSON(baseUrl) });
+      logTopicSaved('admin_topic_created', created);
+      res.status(201).json({ topic: created.toDetailJSON(baseUrl) });
     } catch (e) {
       next(e);
     }
@@ -173,7 +191,17 @@ export function topicRoutes(baseUrl) {
     try {
       const topic = await Topic.findById(req.params.id);
       if (!topic) return res.status(404).json({ error: 'Topic not found' });
-      const { title, description, isPublished, sortOrder } = req.body || {};
+      const { title, description, isPublished, sortOrder, yearOfStudy, topic: topicLabel, topicGroup } =
+        req.body || {};
+      if (yearOfStudy != null && yearOfStudy !== '') {
+        const y = Number(yearOfStudy);
+        if (Number.isFinite(y) && y >= 1 && y <= 6) topic.yearOfStudy = y;
+      }
+      if (topicLabel != null || topicGroup != null) {
+        const groupRaw = topicLabel != null ? String(topicLabel) : String(topicGroup || '');
+        const g = groupRaw.trim() || 'General';
+        topic.topicGroup = g;
+      }
       if (title != null) topic.title = String(title).trim();
       if (description != null) topic.description = String(description);
       if (sortOrder != null) topic.sortOrder = Number(sortOrder);
