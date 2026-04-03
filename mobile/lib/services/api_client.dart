@@ -72,9 +72,9 @@ class ApiClient {
           return 'Timed out reaching $base. Is the server running and port open?';
         case DioExceptionType.connectionError:
           return 'Cannot reach $base.\n'
-              '• Emulator: host should be 10.0.2.2 (default).\n'
-              '• Real phone: use your computer\'s Wi‑Fi IP, e.g.\n'
-              '  flutter run --dart-define=API_BASE=http://192.168.x.x:5000';
+              '• Default API is production (https://medical-rgb5.onrender.com).\n'
+              '• Local backend: flutter run --dart-define=API_BASE=http://10.0.2.2:5000\n'
+              '  (emulator) or http://<your-PC-LAN-IP>:5000 (physical device).';
         case DioExceptionType.badResponse:
           final code = error.response?.statusCode ?? '?';
           final data = error.response?.data;

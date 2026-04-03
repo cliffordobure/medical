@@ -22,7 +22,8 @@ const PORT = Number(process.env.PORT) || 5000;
 const LISTEN_HOST = process.env.LISTEN_HOST || '0.0.0.0';
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/medical_students';
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || 'http://localhost:5173';
-const API_PUBLIC_URL = (process.env.API_PUBLIC_URL || `http://localhost:${PORT}`).replace(/\/$/, '');
+const DEFAULT_API_PUBLIC_URL = 'https://medical-rgb5.onrender.com';
+const API_PUBLIC_URL = (process.env.API_PUBLIC_URL || DEFAULT_API_PUBLIC_URL).replace(/\/$/, '');
 
 async function main() {
   if (!process.env.JWT_SECRET) {
@@ -145,9 +146,8 @@ async function main() {
   });
 
   app.listen(PORT, LISTEN_HOST, () => {
-    console.log(`API on port ${PORT} (${LISTEN_HOST}) — local: http://localhost:${PORT}`);
-    console.log(`Android emulator: http://10.0.2.2:${PORT}  |  LAN: use this PC IP + port`);
-    console.log(`Public base URL for files: ${API_PUBLIC_URL}`);
+    console.log(`API listening on ${LISTEN_HOST}:${PORT}`);
+    console.log(`Public base URL for PDF/audio/ad links: ${API_PUBLIC_URL}`);
   });
 }
 

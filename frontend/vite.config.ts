@@ -5,7 +5,7 @@ import tailwindcss from '@tailwindcss/vite'
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   const proxyTarget =
-    (env.VITE_DEV_PROXY_TARGET || 'http://localhost:5000').replace(/\/$/, '')
+    (env.VITE_DEV_PROXY_TARGET || 'https://medical-rgb5.onrender.com').replace(/\/$/, '')
 
   return {
     plugins: [react(), tailwindcss()],
