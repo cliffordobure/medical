@@ -74,6 +74,14 @@ class ApiClient {
     return 'Could not load data. API: $base';
   }
 
+  /// House interstitial creative for free tier (optional).
+  Future<Map<String, dynamic>?> fetchInterstitialAd() async {
+    final r = await dio.get('/ads/interstitial');
+    final ad = r.data['ad'];
+    if (ad == null) return null;
+    return Map<String, dynamic>.from(ad as Map);
+  }
+
   Future<List<dynamic>> fetchTopics() async {
     final r = await dio.get('/topics');
     return (r.data['topics'] as List<dynamic>?) ?? [];

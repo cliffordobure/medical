@@ -75,3 +75,28 @@ export const uploadTopicFilesMemory = multer({
   limits: { fileSize: 80 * 1024 * 1024 },
   fileFilter,
 }).fields(multerFields);
+
+const imageMimes = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
+
+function adImageFilter(_req, file, cb) {
+  const ext = path.extname(file.originalname || '').toLowerCase();
+  if (imageMimes.has(file.mimetype) || ['.jpg', '.jpeg', '.png', '.webp', '.gif'].includes(ext)) {
+    cb(null, true);
+  } else {
+    cb(new Error('Only image files are allowed (JPEG, PNG, WebP, GIF)'));
+  }
+}
+
+const adLimits = { fileSize: 8 * 1024 * 1024 };
+
+export const uploadAdImage = multer({
+  storage,
+  limits: adLimits,
+  fileFilter: adImageFilter,
+}).single('image');
+
+export const uploadAdImageMemory = multer({
+  storage: multer.memoryStorage(),
+  limits: adLimits,
+  fileFilter: adImageFilter,
+}).single('image');

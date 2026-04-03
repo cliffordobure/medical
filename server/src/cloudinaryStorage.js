@@ -118,9 +118,35 @@ function safeUrlHost(url) {
   }
 }
 
+export function uploadImageBuffer(buffer, originalName) {
+  const safeName = String(originalName || 'ad.jpg')
+    .replace(/[^\w.-]/g, '_')
+    .slice(0, 100);
+  return new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      {
+        folder: 'medstudy/ads',
+        resource_type: 'image',
+        use_filename: true,
+        unique_filename: true,
+        filename_override: safeName,
+      },
+      (err, result) => {
+        if (err) return reject(err);
+        if (!result?.secure_url || !result.public_id) {
+          return reject(new Error('Cloudinary image upload returned no URL'));
+        }
+        resolve({ secureUrl: result.secure_url, publicId: result.public_id });
+      }
+    );
+    stream.end(buffer);
+  });
+}
+
 export async function destroyCloudinaryAsset(publicId, resourceType) {
   if (!publicId) return;
-  const rt = resourceType === 'raw' ? 'raw' : 'video';
+  const rt =
+    resourceType === 'raw' ? 'raw' : resourceType === 'image' ? 'image' : 'video';
   try {
     await cloudinary.uploader.destroy(publicId, { resource_type: rt });
   } catch (e) {

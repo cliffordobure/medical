@@ -34,12 +34,26 @@ export function AdminDashboard() {
     <div>
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="text-2xl font-semibold">Admin — Topics</h1>
-        <Link
-          to="/admin/new"
-          className="rounded-xl bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700"
-        >
-          New topic
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            to="/admin/packages"
+            className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
+          >
+            Packages
+          </Link>
+          <Link
+            to="/admin/ads"
+            className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
+          >
+            Ads
+          </Link>
+          <Link
+            to="/admin/new"
+            className="rounded-xl bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700"
+          >
+            New topic
+          </Link>
+        </div>
       </div>
       {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
       <ul className="mt-8 space-y-3">

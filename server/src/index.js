@@ -5,9 +5,11 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import mongoose from 'mongoose';
 import { connectDb } from './db.js';
-import { openDownloadStream, BUCKET_PDFS, BUCKET_AUDIO } from './gridfsStorage.js';
+import { openDownloadStream, BUCKET_PDFS, BUCKET_AUDIO, BUCKET_AD_IMAGES } from './gridfsStorage.js';
 import { authRouter } from './routes/authRoutes.js';
 import { topicRoutes } from './routes/topicRoutes.js';
+import { adRoutes } from './routes/adRoutes.js';
+import { adminPackageRoutes } from './routes/adminPackageRoutes.js';
 import { paymentRouter, paystackWebhookHandler } from './routes/paymentRoutes.js';
 import { ensureUploadsDir } from './middleware/upload.js';
 import { runSeed } from './seed.js';
@@ -85,7 +87,8 @@ async function main() {
         res.setHeader('Content-Length', String(meta.length));
       }
       const stream = openDownloadStream(bucketName, id);
-      res.setHeader('Content-Type', contentType);
+      const ct = meta.contentType || contentType;
+      res.setHeader('Content-Type', typeof ct === 'string' && ct ? ct : contentType);
       res.setHeader('Accept-Ranges', 'bytes');
       res.setHeader('Access-Control-Allow-Origin', '*');
       res.setHeader('Access-Control-Expose-Headers', 'Content-Length, Content-Range, Accept-Ranges');
@@ -107,14 +110,31 @@ async function main() {
     streamGridFile(res, BUCKET_AUDIO, req.params.id, 'application/octet-stream').catch(next);
   });
 
+  app.options('/api/files/ad-images/:id', staticFileCors, (_req, res) => res.sendStatus(204));
+  app.get('/api/files/ad-images/:id', staticFileCors, (req, res, next) => {
+    streamGridFile(res, BUCKET_AD_IMAGES, req.params.id, 'image/jpeg').catch(next);
+  });
+
   app.use('/api/auth', authRouter);
   app.use('/api', topicRoutes(API_PUBLIC_URL));
+  app.use('/api', adRoutes(API_PUBLIC_URL));
+  app.use('/api', adminPackageRoutes());
   app.use('/api', paymentRouter(CLIENT_ORIGIN));
 
-  app.get('/api/health', (_req, res) => res.json({ ok: true }));
+  app.get('/api/health', (_req, res) =>
+    res.json({
+      ok: true,
+      /** Present only on current API builds — use to confirm Render deployed latest `server/`. */
+      features: { adminAds: true, adminPackages: true },
+    })
+  );
 
   app.use((err, _req, res, _next) => {
-    if (err?.message === 'Only PDF files are allowed' || err?.message === 'Only audio files are allowed (mp3, wav, m4a, etc.)') {
+    if (
+      err?.message === 'Only PDF files are allowed' ||
+      err?.message === 'Only audio files are allowed (mp3, wav, m4a, etc.)' ||
+      err?.message?.startsWith?.('Only image files are allowed')
+    ) {
       return res.status(400).json({ error: err.message });
     }
     if (err?.name === 'MulterError') {

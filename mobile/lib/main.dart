@@ -1,11 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:just_audio_background/just_audio_background.dart';
 
 import 'screens/topics_screen.dart';
 import 'services/api_client.dart';
 import 'theme/app_theme.dart' show AppColors, buildMedStudyTheme;
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await JustAudioBackground.init(
+    androidNotificationChannelId: 'com.medicalstudents.medical_students_app.audio',
+    androidNotificationChannelName: 'MedStudy audio',
+    androidNotificationOngoing: true,
+  );
   runApp(const MedStudyApp());
 }
 
@@ -37,6 +43,8 @@ class _MedStudyAppState extends State<MedStudyApp> {
         await ApiClient.saveToken(null);
         if (mounted) setState(() => _user = null);
       }
+    } else {
+      if (mounted) setState(() => _user = null);
     }
     if (mounted) setState(() => _boot = false);
   }

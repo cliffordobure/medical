@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 
 export const BUCKET_PDFS = 'topic_pdfs';
 export const BUCKET_AUDIO = 'topic_audio';
+export const BUCKET_AD_IMAGES = 'ad_images';
 
 function bucket(name) {
   return new mongoose.mongo.GridFSBucket(mongoose.connection.db, { bucketName: name });

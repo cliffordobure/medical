@@ -305,6 +305,7 @@ class _TopicsScreenState extends State<TopicsScreen> {
                                 api: widget.api,
                                 slug: slug,
                                 premium: premium,
+                                onPremiumChanged: widget.onAuthChanged,
                               ),
                             ),
                           );
@@ -360,6 +361,7 @@ class _TopicsScreenState extends State<TopicsScreen> {
                           api: widget.api,
                           slug: slug,
                           premium: premium,
+                          onPremiumChanged: widget.onAuthChanged,
                         ),
                       ),
                     );
@@ -418,6 +420,7 @@ class _TopicsScreenState extends State<TopicsScreen> {
                                 api: widget.api,
                                 slug: slug,
                                 premium: premium,
+                                onPremiumChanged: widget.onAuthChanged,
                               ),
                             ),
                           );

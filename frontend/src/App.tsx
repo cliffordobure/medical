@@ -7,6 +7,8 @@ import { Register } from './pages/Register'
 import { TopicDetailPage } from './pages/TopicDetailPage'
 import { AdminDashboard } from './pages/AdminDashboard'
 import { AdminTopicForm } from './pages/AdminTopicForm'
+import { AdminPackages } from './pages/AdminPackages'
+import { AdminAds } from './pages/AdminAds'
 import { Subscribe } from './pages/Subscribe'
 import { PaymentCallback } from './pages/PaymentCallback'
 
@@ -48,6 +50,22 @@ function AppRoutes() {
           element={
             <AdminRoute>
               <AdminTopicForm />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="/admin/packages"
+          element={
+            <AdminRoute>
+              <AdminPackages />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="/admin/ads"
+          element={
+            <AdminRoute>
+              <AdminAds />
             </AdminRoute>
           }
         />
