@@ -9,6 +9,9 @@ import '../util/app_log.dart';
 
 const _tokenKey = 'medstudy_token';
 
+/// Public routes must not send `Authorization` (expired tokens / gateways can cause 401).
+const String kSkipAuthExtra = 'skipAuth';
+
 BaseOptions _baseOptions() {
   return BaseOptions(
     baseUrl: AppConfig.apiPrefix,
@@ -25,9 +28,16 @@ class ApiClient {
     dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
+          if (options.extra[kSkipAuthExtra] == true) {
+            options.headers.remove('Authorization');
+            handler.next(options);
+            return;
+          }
           final t = await getToken();
           if (t != null && t.isNotEmpty) {
             options.headers['Authorization'] = 'Bearer $t';
+          } else {
+            options.headers.remove('Authorization');
           }
           handler.next(options);
         },
@@ -66,7 +76,16 @@ class ApiClient {
               '• Real phone: use your computer\'s Wi‑Fi IP, e.g.\n'
               '  flutter run --dart-define=API_BASE=http://192.168.x.x:5000';
         case DioExceptionType.badResponse:
-          return 'Server error (${error.response?.statusCode ?? '?'}).';
+          final code = error.response?.statusCode ?? '?';
+          final data = error.response?.data;
+          var tail = '';
+          if (data is Map && data['error'] is String) {
+            tail = ' ${data['error']}';
+          }
+          if (code == 401) {
+            return 'Unauthorized (401).$tail Try logging out and back in, or check the API URL matches your deployed server.';
+          }
+          return 'Server error ($code).$tail';
         default:
           break;
       }
@@ -74,23 +93,33 @@ class ApiClient {
     return 'Could not load data. API: $base';
   }
 
-  /// House interstitial creative for free tier (optional).
+  /// House interstitial creative for free tier (optional). No auth — same DB as admin ads.
   Future<Map<String, dynamic>?> fetchInterstitialAd() async {
-    final r = await dio.get('/ads/interstitial');
-    final ad = r.data['ad'];
-    if (ad == null) return null;
-    return Map<String, dynamic>.from(ad as Map);
+    final r = await dio.get<Map<String, dynamic>>(
+      '/ads/interstitial',
+      options: Options(extra: {kSkipAuthExtra: true}),
+    );
+    final rawAd = r.data?['ad'];
+    if (rawAd == null) return null;
+    if (rawAd is! Map) return null;
+    return Map<String, dynamic>.from(rawAd);
   }
 
   Future<List<dynamic>> fetchTopics() async {
-    final r = await dio.get('/topics');
+    final r = await dio.get(
+      '/topics',
+      options: Options(extra: {kSkipAuthExtra: true}),
+    );
     return (r.data['topics'] as List<dynamic>?) ?? [];
   }
 
   Future<Map<String, dynamic>> fetchTopic(String slug) async {
     medstudyLog('GET /api/topics/$slug …');
     try {
-      final r = await dio.get('/topics/$slug');
+      final r = await dio.get(
+        '/topics/$slug',
+        options: Options(extra: {kSkipAuthExtra: true}),
+      );
       final raw = r.data['topic'];
       final topic = Map<String, dynamic>.from(raw as Map);
       medstudyLog(
@@ -119,8 +148,29 @@ class ApiClient {
   }
 
   Future<Map<String, dynamic>> fetchPackages() async {
-    final r = await dio.get('/packages');
-    return Map<String, dynamic>.from(r.data as Map);
+    try {
+      final r = await dio.get<Map<String, dynamic>>(
+        '/packages',
+        options: Options(extra: {kSkipAuthExtra: true}),
+      );
+      final data = r.data;
+      if (data == null) {
+        throw DioException(
+          requestOptions: r.requestOptions,
+          message: 'Empty response from /packages',
+        );
+      }
+      if (!data.containsKey('packages')) {
+        throw FormatException('Server JSON missing "packages" key');
+      }
+      return data;
+    } on DioException catch (e, st) {
+      medstudyLogError('fetchPackages', e, st);
+      rethrow;
+    } on FormatException catch (e, st) {
+      medstudyLogError('fetchPackages bad JSON', e, st);
+      rethrow;
+    }
   }
 
   Future<Map<String, dynamic>> initializePayment(String packageId) async {

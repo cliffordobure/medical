@@ -78,11 +78,11 @@ export function topicRoutes(baseUrl) {
   admin.use(authRequired, loadUser, adminOnly);
 
   /** Confirms which storage mode the server uses (no secrets). */
-  admin.get('/admin/upload-settings', (_req, res) => {
+  admin.get('/upload-settings', (_req, res) => {
     res.json({ uploadDriver: getUploadDriver() });
   });
 
-  admin.get('/admin/topics', async (_req, res, next) => {
+  admin.get('/topics', async (_req, res, next) => {
     try {
       const topics = await Topic.find().sort({ sortOrder: 1, title: 1 });
       res.json({ topics: topics.map((t) => t.toDetailJSON(baseUrl)) });
@@ -91,7 +91,7 @@ export function topicRoutes(baseUrl) {
     }
   });
 
-  admin.post('/admin/topics', topicUpload(), async (req, res, next) => {
+  admin.post('/topics', topicUpload(), async (req, res, next) => {
     try {
       const { title, description, isPublished, sortOrder } = req.body || {};
       if (!title) return res.status(400).json({ error: 'Title is required' });
@@ -169,7 +169,7 @@ export function topicRoutes(baseUrl) {
     }
   });
 
-  admin.patch('/admin/topics/:id', topicUpload(), async (req, res, next) => {
+  admin.patch('/topics/:id', topicUpload(), async (req, res, next) => {
     try {
       const topic = await Topic.findById(req.params.id);
       if (!topic) return res.status(404).json({ error: 'Topic not found' });
@@ -237,7 +237,7 @@ export function topicRoutes(baseUrl) {
     }
   });
 
-  admin.delete('/admin/topics/:id', async (req, res, next) => {
+  admin.delete('/topics/:id', async (req, res, next) => {
     try {
       const topic = await Topic.findById(req.params.id);
       if (!topic) return res.status(404).json({ error: 'Topic not found' });
@@ -250,6 +250,6 @@ export function topicRoutes(baseUrl) {
     }
   });
 
-  router.use(admin);
+  router.use('/admin', admin);
   return router;
 }

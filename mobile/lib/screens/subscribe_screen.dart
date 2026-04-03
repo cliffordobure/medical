@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../config.dart';
 import '../services/api_client.dart';
 import '../theme/app_theme.dart';
 
@@ -34,10 +35,20 @@ class _SubscribeScreenState extends State<SubscribeScreen> {
 
   Future<void> _load() async {
     try {
+      await ApiClient.pokeHealthEndpoint();
+      if (!mounted) return;
       final data = await widget.api.fetchPackages();
-      setState(() => _packages = data['packages'] as List<dynamic>? ?? []);
-    } catch (_) {
-      setState(() => _error = 'Could not load packages.');
+      final list = data['packages'] as List<dynamic>? ?? [];
+      setState(() {
+        _packages = list;
+        _error = null;
+      });
+    } catch (e) {
+      var msg = ApiClient.connectionHint(e);
+      if (e is FormatException) {
+        msg = 'Invalid response from server. Redeploy the API or check ${AppConfig.apiBase}';
+      }
+      if (mounted) setState(() => _error = msg);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -132,8 +143,36 @@ class _SubscribeScreenState extends State<SubscribeScreen> {
                 if (_error != null) ...[
                   const SizedBox(height: 16),
                   Text(_error!, style: const TextStyle(color: AppColors.error)),
+                  const SizedBox(height: 12),
+                  TextButton.icon(
+                    onPressed: () {
+                      setState(() {
+                        _loading = true;
+                        _error = null;
+                      });
+                      _load();
+                    },
+                    icon: const Icon(Icons.refresh_rounded, color: AppColors.spotifyGreen),
+                    label: const Text('Retry', style: TextStyle(color: AppColors.spotifyGreen)),
+                  ),
                 ],
                 const SizedBox(height: 20),
+                if (_packages.isEmpty && _error == null) ...[
+                  Text(
+                    'No subscription plans are available. On the web admin, open Admin → Packages and ensure at least one package is active, then tap Retry.',
+                    style: TextStyle(color: AppColors.textMuted.withValues(alpha: 0.95), height: 1.35),
+                  ),
+                  const SizedBox(height: 12),
+                  TextButton.icon(
+                    onPressed: () {
+                      setState(() => _loading = true);
+                      _load();
+                    },
+                    icon: const Icon(Icons.refresh_rounded, color: AppColors.spotifyGreen),
+                    label: const Text('Retry', style: TextStyle(color: AppColors.spotifyGreen)),
+                  ),
+                  const SizedBox(height: 8),
+                ],
                 ..._packages.map((p) {
                   final m = p as Map<String, dynamic>;
                   final kobo = (m['amountKobo'] as num).toInt();

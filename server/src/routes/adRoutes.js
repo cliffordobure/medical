@@ -27,6 +27,7 @@ function clearImageFields(ad) {
 export function adRoutes(baseUrl) {
   const router = Router();
 
+  /** Public — no JWT. Returns a random active creative; app must use same API host as Admin → Ads. */
   router.get('/ads/interstitial', async (_req, res, next) => {
     try {
       const list = await AdCreative.find({ active: true }).sort({ sortOrder: 1 });
@@ -47,7 +48,7 @@ export function adRoutes(baseUrl) {
   const admin = Router();
   admin.use(authRequired, loadUser, adminOnly);
 
-  admin.get('/admin/ads', async (_req, res, next) => {
+  admin.get('/ads', async (_req, res, next) => {
     try {
       const ads = await AdCreative.find().sort({ sortOrder: 1, createdAt: -1 });
       res.json({ ads: ads.map((a) => a.toClientJSON(baseUrl)) });
@@ -56,7 +57,7 @@ export function adRoutes(baseUrl) {
     }
   });
 
-  admin.post('/admin/ads', adUpload(), async (req, res, next) => {
+  admin.post('/ads', adUpload(), async (req, res, next) => {
     try {
       const file = req.file;
       if (!file) return res.status(400).json({ error: 'Image file is required' });
@@ -97,7 +98,7 @@ export function adRoutes(baseUrl) {
     }
   });
 
-  admin.patch('/admin/ads/:id', async (req, res, next) => {
+  admin.patch('/ads/:id', async (req, res, next) => {
     try {
       const ad = await AdCreative.findById(req.params.id);
       if (!ad) return res.status(404).json({ error: 'Ad not found' });
@@ -112,7 +113,7 @@ export function adRoutes(baseUrl) {
     }
   });
 
-  admin.post('/admin/ads/:id/image', adUpload(), async (req, res, next) => {
+  admin.post('/ads/:id/image', adUpload(), async (req, res, next) => {
     try {
       const ad = await AdCreative.findById(req.params.id);
       if (!ad) return res.status(404).json({ error: 'Ad not found' });
@@ -141,7 +142,7 @@ export function adRoutes(baseUrl) {
     }
   });
 
-  admin.delete('/admin/ads/:id', async (req, res, next) => {
+  admin.delete('/ads/:id', async (req, res, next) => {
     try {
       const ad = await AdCreative.findById(req.params.id);
       if (!ad) return res.status(404).json({ error: 'Ad not found' });
@@ -153,6 +154,6 @@ export function adRoutes(baseUrl) {
     }
   });
 
-  router.use(admin);
+  router.use('/admin', admin);
   return router;
 }

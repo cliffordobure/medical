@@ -4,9 +4,10 @@ import { authRequired, loadUser, adminOnly } from '../middleware/auth.js';
 
 export function adminPackageRoutes() {
   const router = Router();
-  router.use(authRequired, loadUser, adminOnly);
+  const admin = Router();
+  admin.use(authRequired, loadUser, adminOnly);
 
-  router.get('/admin/packages', async (_req, res, next) => {
+  admin.get('/packages', async (_req, res, next) => {
     try {
       const packages = await SubscriptionPackage.find().sort({ intervalMonths: 1, displayName: 1 });
       res.json({
@@ -26,7 +27,7 @@ export function adminPackageRoutes() {
     }
   });
 
-  router.post('/admin/packages', async (req, res, next) => {
+  admin.post('/packages', async (req, res, next) => {
     try {
       const { key, displayName, description, amountKobo, intervalMonths, active, paystackPlanCode } =
         req.body || {};
@@ -61,7 +62,7 @@ export function adminPackageRoutes() {
     }
   });
 
-  router.patch('/admin/packages/:id', async (req, res, next) => {
+  admin.patch('/packages/:id', async (req, res, next) => {
     try {
       const pkg = await SubscriptionPackage.findById(req.params.id);
       if (!pkg) return res.status(404).json({ error: 'Package not found' });
@@ -99,7 +100,7 @@ export function adminPackageRoutes() {
     }
   });
 
-  router.delete('/admin/packages/:id', async (req, res, next) => {
+  admin.delete('/packages/:id', async (req, res, next) => {
     try {
       const pkg = await SubscriptionPackage.findById(req.params.id);
       if (!pkg) return res.status(404).json({ error: 'Package not found' });
@@ -110,5 +111,6 @@ export function adminPackageRoutes() {
     }
   });
 
+  router.use('/admin', admin);
   return router;
 }

@@ -21,6 +21,7 @@ function paystackRequest(path, method, body) {
 export function paymentRouter(clientOrigin) {
   const router = Router();
 
+  /** Public catalog — no JWT (mobile must not require login to list plans). */
   router.get('/packages', async (_req, res, next) => {
     try {
       const pk = process.env.PAYSTACK_PUBLIC_KEY || '';

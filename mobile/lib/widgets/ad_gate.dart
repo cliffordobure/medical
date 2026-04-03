@@ -2,7 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../config.dart';
 import '../services/api_client.dart';
+import '../util/app_log.dart';
 import '../theme/app_theme.dart';
 import '../util/url_resolve.dart';
 
@@ -52,6 +54,7 @@ class _AdGateDialogState extends State<_AdGateDialog> {
   String? _imageUrl;
   String? _headline;
   bool _adLoadDone = false;
+  bool _adFetchFailed = false;
 
   @override
   void initState() {
@@ -77,9 +80,16 @@ class _AdGateDialogState extends State<_AdGateDialog> {
         _headline = line;
         _imageUrl = raw != null ? resolveMediaUrl(raw) : null;
         _adLoadDone = true;
+        _adFetchFailed = false;
       });
-    } catch (_) {
-      if (mounted) setState(() => _adLoadDone = true);
+    } catch (e, st) {
+      medstudyLogError('fetchInterstitialAd', e, st);
+      if (mounted) {
+        setState(() {
+          _adLoadDone = true;
+          _adFetchFailed = true;
+        });
+      }
     }
   }
 
@@ -194,13 +204,28 @@ class _AdGateDialogState extends State<_AdGateDialog> {
             child: const CircularProgressIndicator(color: AppColors.spotifyGreen, strokeWidth: 2),
           );
         },
-        errorBuilder: (_, __, ___) => _placeholder(),
+        errorBuilder: (_, __, ___) => _placeholder(imageLoadFailed: true),
       );
     }
     return _placeholder();
   }
 
-  Widget _placeholder() {
+  Widget _placeholder({bool imageLoadFailed = false}) {
+    final lines = _adFetchFailed
+        ? [
+            'Could not load ad from the API.',
+            'Use the same backend as admin (app API_BASE = web VITE_API_URL). Redeploy server with /api/ads/interstitial.',
+            'Host: ${AppConfig.apiBase}',
+          ]
+        : imageLoadFailed
+            ? [
+                'Image failed to load (URL or network).',
+                'Re-upload the ad or check Cloudinary / file URLs on the server.',
+              ]
+            : [
+                'No ad image for this break.',
+                'Add one in Admin → Ads on the same server (${AppConfig.apiBase}).',
+              ];
     return Container(
       width: double.infinity,
       alignment: Alignment.center,
@@ -213,10 +238,10 @@ class _AdGateDialogState extends State<_AdGateDialog> {
         ),
       ),
       padding: const EdgeInsets.all(16),
-      child: const Text(
-        'Add sponsor images in Admin → Ads',
+      child: Text(
+        lines.join('\n'),
         textAlign: TextAlign.center,
-        style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.w600, fontSize: 13),
+        style: const TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.w600, fontSize: 12, height: 1.35),
       ),
     );
   }
