@@ -145,12 +145,14 @@ export function paymentRouter(clientOrigin) {
         return res.status(400).json({ error: 'Payment not successful' });
       }
       const meta = d.metadata || {};
-      if (meta.userId !== req.user._id.toString()) {
+      const metaUserId = String(meta.userId ?? meta.user_id ?? '');
+      if (metaUserId !== req.user._id.toString()) {
         return res.status(403).json({ error: 'Reference does not belong to this user' });
       }
       await applyPremiumFromMetadata({
-        userId: meta.userId,
-        intervalMonths: meta.intervalMonths,
+        userId: metaUserId,
+        intervalMonths: meta.intervalMonths ?? meta.interval_months,
+        paystackReference: reference,
       });
       const user = await User.findById(req.user._id);
       res.json({ ok: true, user: user.toPublicJSON() });
@@ -178,9 +180,11 @@ export async function paystackWebhookHandler(req, res) {
     const data = payload.data;
     if (event === 'charge.success' && data?.metadata) {
       const m = data.metadata;
+      const ref = data.reference != null ? String(data.reference) : '';
       await applyPremiumFromMetadata({
-        userId: m.userId,
-        intervalMonths: m.intervalMonths,
+        userId: m.userId != null ? String(m.userId) : m.user_id != null ? String(m.user_id) : undefined,
+        intervalMonths: m.intervalMonths ?? m.interval_months,
+        paystackReference: ref || undefined,
       });
     }
     res.sendStatus(200);

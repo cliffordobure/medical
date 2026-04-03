@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -18,12 +21,20 @@ class SubscribeScreen extends StatefulWidget {
   State<SubscribeScreen> createState() => _SubscribeScreenState();
 }
 
-class _SubscribeScreenState extends State<SubscribeScreen> {
+class _SubscribeScreenState extends State<SubscribeScreen> with WidgetsBindingObserver {
+  static const Duration _pollInterval = Duration(seconds: 4);
+  static const int _maxPollTicks = 45;
+
   List<dynamic> _packages = [];
   String _currency = 'KES';
   String? _error;
   bool _loading = true;
   final _ref = TextEditingController();
+
+  Timer? _pollTimer;
+  String? _pendingReference;
+  bool _checkingPayment = false;
+  int _pollTicks = 0;
 
   String _formatPrice(int minor, String currency) {
     final major = minor / 100.0;
@@ -40,13 +51,98 @@ class _SubscribeScreenState extends State<SubscribeScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _load();
   }
 
   @override
   void dispose() {
+    _stopPremiumPolling();
+    WidgetsBinding.instance.removeObserver(this);
     _ref.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed &&
+        _pendingReference != null &&
+        _checkingPayment) {
+      unawaited(_pollPremiumOnce());
+    }
+  }
+
+  void _stopPremiumPolling() {
+    _pollTimer?.cancel();
+    _pollTimer = null;
+    _pollTicks = 0;
+    if (mounted) {
+      setState(() => _checkingPayment = false);
+    } else {
+      _checkingPayment = false;
+    }
+  }
+
+  void _startPremiumPolling(String reference) {
+    _pollTimer?.cancel();
+    _pollTimer = null;
+    _pollTicks = 0;
+    _pendingReference = reference;
+    if (!mounted) return;
+    setState(() {
+      _checkingPayment = true;
+      _error = null;
+    });
+    _pollTimer = Timer.periodic(_pollInterval, (_) async {
+      _pollTicks++;
+      if (_pollTicks > _maxPollTicks) {
+        _stopPremiumPolling();
+        if (mounted) {
+          final pending = _pendingReference;
+          setState(() {
+            _error =
+                'Payment not confirmed yet. Check your Paystack SMS or email for the reference, or tap Retry after completing payment.';
+            if (pending != null && _ref.text.trim().isEmpty) {
+              _ref.text = pending;
+            }
+          });
+        }
+        return;
+      }
+      await _pollPremiumOnce();
+    });
+    unawaited(
+      Future<void>.delayed(const Duration(seconds: 2), _pollPremiumOnce),
+    );
+  }
+
+  Future<void> _pollPremiumOnce() async {
+    final ref = _pendingReference;
+    if (ref == null || ref.isEmpty || !mounted) return;
+    try {
+      await widget.api.verifyPayment(ref);
+      if (!mounted) return;
+      _pollTimer?.cancel();
+      _pollTimer = null;
+      _pollTicks = 0;
+      _pendingReference = null;
+      setState(() => _checkingPayment = false);
+      widget.onDone?.call();
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Premium activated')),
+      );
+    } on DioException catch (e) {
+      final code = e.response?.statusCode;
+      if (code != null && code != 400 && code != 403 && mounted) {
+        setState(() {
+          _error = ApiClient.dioErrorMessage(
+            e,
+            fallback: 'Could not confirm payment. Try again or use reference below.',
+          );
+        });
+      }
+    } catch (_) {}
   }
 
   Future<void> _load() async {
@@ -136,8 +232,13 @@ class _SubscribeScreenState extends State<SubscribeScreen> {
     try {
       final init = await widget.api.initializePayment(pkg['id'] as String);
       final url = Uri.parse(init['authorizationUrl'] as String);
+      final reference = (init['reference'] as String?)?.trim();
       if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
         setState(() => _error = 'Could not open browser.');
+        return;
+      }
+      if (reference != null && reference.isNotEmpty) {
+        _startPremiumPolling(reference);
       }
     } catch (e) {
       setState(() {
@@ -222,9 +323,31 @@ class _SubscribeScreenState extends State<SubscribeScreen> {
                 ),
                 const SizedBox(height: 20),
                 const Text(
-                  'Pay in the browser, then verify with your reference if needed.',
+                  'Pay in the browser. When you return to the app, we confirm Premium automatically (no need to paste the reference).',
                   style: TextStyle(color: AppColors.textSecondary, height: 1.4),
                 ),
+                if (_checkingPayment) ...[
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Waiting for payment…',
+                          style: TextStyle(
+                            color: AppColors.spotifyGreen.withValues(alpha: 0.95),
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
                 if (_error != null) ...[
                   const SizedBox(height: 16),
                   Text(_error!, style: const TextStyle(color: AppColors.error)),
@@ -316,12 +439,17 @@ class _SubscribeScreenState extends State<SubscribeScreen> {
                 }),
                 const SizedBox(height: 28),
                 const Text(
-                  'Verify payment',
+                  'Still waiting?',
                   style: TextStyle(
                     color: AppColors.textPrimary,
                     fontWeight: FontWeight.w800,
                     fontSize: 16,
                   ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'If automatic confirmation does not run, paste the Paystack reference.',
+                  style: TextStyle(color: AppColors.textMuted.withValues(alpha: 0.95), height: 1.35),
                 ),
                 const SizedBox(height: 10),
                 TextField(
