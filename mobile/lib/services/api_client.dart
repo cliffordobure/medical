@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../config.dart';
+import '../util/app_log.dart';
 
 const _tokenKey = 'medstudy_token';
 
@@ -79,8 +80,19 @@ class ApiClient {
   }
 
   Future<Map<String, dynamic>> fetchTopic(String slug) async {
-    final r = await dio.get('/topics/$slug');
-    return Map<String, dynamic>.from(r.data['topic'] as Map);
+    medstudyLog('GET /api/topics/$slug …');
+    try {
+      final r = await dio.get('/topics/$slug');
+      final raw = r.data['topic'];
+      final topic = Map<String, dynamic>.from(raw as Map);
+      medstudyLog(
+        'topic ok: title=${topic['title']} pdfUrl=${topic['pdfUrl']} audioUrl=${topic['audioUrl']}',
+      );
+      return topic;
+    } catch (e, st) {
+      medstudyLogError('fetchTopic("$slug")', e, st);
+      rethrow;
+    }
   }
 
   Future<Map<String, dynamic>> login(String email, String password) async {
@@ -116,6 +128,7 @@ class ApiClient {
   /// Wakes a sleeping host (e.g. Render) with a tiny request before a large PDF download.
   static Future<void> pokeHealthEndpoint() async {
     final uri = Uri.parse('${AppConfig.apiBase}/api/health');
+    medstudyLog('GET $uri (wake server)');
     final d = Dio(
       BaseOptions(
         connectTimeout: const Duration(seconds: 150),
@@ -125,8 +138,9 @@ class ApiClient {
     );
     try {
       await d.getUri(uri).timeout(const Duration(seconds: 180));
-    } catch (_) {
-      /* ignore — best-effort wake */
+      medstudyLog('health ok');
+    } catch (e) {
+      medstudyLog('health wake failed (continuing): $e');
     }
   }
 
@@ -146,8 +160,10 @@ class ApiClient {
       ),
     );
 
+    medstudyLog('downloadBytes: $absoluteUrl');
     for (var attempt = 0; attempt < 3; attempt++) {
       if (attempt > 0) {
+        medstudyLog('downloadBytes retry #$attempt');
         await Future<void>.delayed(Duration(seconds: 2 * attempt));
       }
       try {
@@ -166,10 +182,16 @@ class ApiClient {
                 const Duration(minutes: 15),
               ),
             );
+        medstudyLog('downloadBytes done: ${r.data?.length ?? 0} bytes');
         return Uint8List.fromList(r.data ?? []);
       } on TimeoutException {
+        medstudyLogError('downloadBytes timeout', absoluteUrl);
         rethrow;
       } on DioException catch (e) {
+        medstudyLogError(
+          'downloadBytes Dio ${e.response?.statusCode} ${e.type}',
+          e.message,
+        );
         final retry = e.type == DioExceptionType.connectionTimeout ||
             e.type == DioExceptionType.receiveTimeout ||
             e.type == DioExceptionType.connectionError;

@@ -5,8 +5,10 @@ import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:pdfx/pdfx.dart';
 
+import '../config.dart';
 import '../services/api_client.dart';
 import '../theme/app_theme.dart';
+import '../util/app_log.dart';
 import '../util/url_resolve.dart';
 import '../widgets/ad_gate.dart';
 
@@ -41,8 +43,18 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
     try {
       final t = await widget.api.fetchTopic(widget.slug);
       setState(() => _topic = t);
-    } catch (_) {
-      setState(() => _error = 'Topic not found.');
+    } catch (e, st) {
+      medstudyLogError('TopicDetailScreen.fetchTopic("${widget.slug}")', e, st);
+      var msg = 'Could not load topic. Check console / Run log for [medstudy].';
+      if (e is DioException) {
+        final code = e.response?.statusCode;
+        if (code == 404) {
+          msg = 'Topic not found (404). Check slug and that the topic is published in admin.';
+        } else if (code != null) {
+          msg = 'Server error ($code). API: ${AppConfig.apiBase}';
+        }
+      }
+      setState(() => _error = msg);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -172,6 +184,7 @@ class _PdfPaneState extends State<_PdfPane> {
       });
       return;
     }
+    medstudyLog('PDF opening: $url');
     try {
       if (mounted) {
         setState(() {
@@ -243,7 +256,8 @@ class _PdfPaneState extends State<_PdfPane> {
         _err =
             'PDF download took too long (15 min). Try again on Wi‑Fi, or upgrade Render so the app does not sleep.';
       });
-    } catch (e) {
+    } catch (e, st) {
+      medstudyLogError('PDF pane', e, st);
       String msg = 'Could not load PDF.';
       if (e is DioException) {
         final code = e.response?.statusCode;
@@ -372,13 +386,22 @@ class _AudioPaneState extends State<_AudioPane> {
   double _playedSinceAd = 0;
   double _nextAt = 60;
   bool _adOpen = false;
+  String? _audioInitError;
 
   @override
   void initState() {
     super.initState();
     final url = widget.audioUrl;
     if (url != null) {
-      _player.setUrl(url);
+      _initAudio(url);
+    }
+  }
+
+  Future<void> _initAudio(String url) async {
+    medstudyLog('audio setUrl: $url');
+    try {
+      await _player.setUrl(url);
+      if (!mounted) return;
       if (!widget.premium) {
         _posSub = _player.positionStream.listen((pos) {
           if (_adOpen || !mounted) return;
@@ -390,6 +413,9 @@ class _AudioPaneState extends State<_AudioPane> {
           }
         });
       }
+    } catch (e, st) {
+      medstudyLogError('audio setUrl', e, st);
+      if (mounted) setState(() => _audioInitError = 'Could not load audio. See log: $e');
     }
   }
 
@@ -421,6 +447,15 @@ class _AudioPaneState extends State<_AudioPane> {
     if (url == null) {
       return const Center(
         child: Text('No audio for this topic.', style: TextStyle(color: AppColors.textSecondary)),
+      );
+    }
+    final err = _audioInitError;
+    if (err != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text(err, textAlign: TextAlign.center, style: const TextStyle(color: AppColors.error)),
+        ),
       );
     }
     return Padding(

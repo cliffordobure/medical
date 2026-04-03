@@ -1,4 +1,5 @@
 import { v2 as cloudinary } from 'cloudinary';
+import { isUploadDebug, logCloudinary } from './uploadLog.js';
 
 export function configureCloudinary() {
   const name = process.env.CLOUDINARY_CLOUD_NAME;
@@ -18,6 +19,9 @@ export function uploadPdfBuffer(buffer, originalName) {
   const safeName = String(originalName || 'notes.pdf')
     .replace(/[^\w.-]/g, '_')
     .slice(0, 100);
+  if (isUploadDebug()) {
+    logCloudinary('pdf_start', 'upload_stream', { bytes: buffer?.length ?? 0, name: safeName });
+  }
   return new Promise((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(
       {
@@ -28,10 +32,21 @@ export function uploadPdfBuffer(buffer, originalName) {
         filename_override: safeName,
       },
       (err, result) => {
-        if (err) return reject(err);
+        if (err) {
+          logCloudinary('pdf_error', err.message || String(err), {
+            httpCode: err.http_code,
+            name: safeName,
+          });
+          return reject(err);
+        }
         if (!result?.secure_url || !result.public_id) {
+          logCloudinary('pdf_error', 'no_url_in_response', { name: safeName });
           return reject(new Error('Cloudinary PDF upload returned no URL'));
         }
+        logCloudinary('pdf_ok', 'stored', {
+          publicId: result.public_id,
+          urlHost: safeUrlHost(result.secure_url),
+        });
         resolve({ secureUrl: result.secure_url, publicId: result.public_id });
       }
     );
@@ -50,6 +65,13 @@ export function uploadAudioBuffer(buffer, originalName) {
 
   const uploadAs = (resourceType) =>
     new Promise((resolve, reject) => {
+      if (isUploadDebug()) {
+        logCloudinary('audio_start', 'upload_stream', {
+          resourceType,
+          bytes: buffer?.length ?? 0,
+          name: safeName,
+        });
+      }
       const stream = cloudinary.uploader.upload_stream(
         {
           folder: 'medstudy/audio',
@@ -59,17 +81,41 @@ export function uploadAudioBuffer(buffer, originalName) {
           filename_override: safeName,
         },
         (err, result) => {
-          if (err) return reject(err);
+          if (err) {
+            logCloudinary('audio_error', err.message || String(err), {
+              resourceType,
+              httpCode: err.http_code,
+              name: safeName,
+            });
+            return reject(err);
+          }
           if (!result?.secure_url || !result.public_id) {
+            logCloudinary('audio_error', 'no_url_in_response', { resourceType, name: safeName });
             return reject(new Error('Cloudinary audio upload returned no URL'));
           }
+          logCloudinary('audio_ok', 'stored', {
+            resourceType,
+            publicId: result.public_id,
+            urlHost: safeUrlHost(result.secure_url),
+          });
           resolve({ secureUrl: result.secure_url, publicId: result.public_id, resourceType });
         }
       );
       stream.end(buffer);
     });
 
-  return uploadAs('video').catch(() => uploadAs('raw'));
+  return uploadAs('video').catch((firstErr) => {
+    logCloudinary('audio_retry', 'video_failed_try_raw', { message: firstErr?.message });
+    return uploadAs('raw');
+  });
+}
+
+function safeUrlHost(url) {
+  try {
+    return new URL(url).host;
+  } catch {
+    return 'invalid';
+  }
 }
 
 export async function destroyCloudinaryAsset(publicId, resourceType) {

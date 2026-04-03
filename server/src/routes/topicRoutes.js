@@ -15,6 +15,7 @@ import {
   destroyCloudinaryAsset,
 } from '../cloudinaryStorage.js';
 import { useCloudinary, useGridfs, getUploadDriver } from '../uploadDriver.js';
+import { logTopicSaved, logTopicFetchIfEnabled } from '../uploadLog.js';
 
 const topicUpload = () =>
   useCloudinary() || useGridfs() ? uploadTopicFilesMemory : uploadTopicFiles;
@@ -65,7 +66,9 @@ export function topicRoutes(baseUrl) {
     try {
       const topic = await Topic.findOne({ slug: req.params.slug, isPublished: true });
       if (!topic) return res.status(404).json({ error: 'Topic not found' });
-      res.json({ topic: topic.toDetailJSON(baseUrl) });
+      const detail = topic.toDetailJSON(baseUrl);
+      logTopicFetchIfEnabled(req.params.slug, detail.pdfUrl, detail.audioUrl);
+      res.json({ topic: detail });
     } catch (e) {
       next(e);
     }
@@ -159,6 +162,7 @@ export function topicRoutes(baseUrl) {
         sortOrder: sortOrder != null ? Number(sortOrder) : 0,
         isPublished: isPublished === 'true' || isPublished === true,
       });
+      logTopicSaved('admin_topic_created', topic);
       res.status(201).json({ topic: topic.toDetailJSON(baseUrl) });
     } catch (e) {
       next(e);
@@ -224,6 +228,9 @@ export function topicRoutes(baseUrl) {
         if (!existing) topic.slug = newSlug;
       }
       await topic.save();
+      if (files.pdf?.[0] || files.audio?.[0]) {
+        logTopicSaved('admin_topic_files_updated', topic);
+      }
       res.json({ topic: topic.toDetailJSON(baseUrl) });
     } catch (e) {
       next(e);
