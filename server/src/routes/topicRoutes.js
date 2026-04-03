@@ -14,7 +14,7 @@ import {
   uploadAudioBuffer,
   destroyCloudinaryAsset,
 } from '../cloudinaryStorage.js';
-import { useCloudinary, useGridfs } from '../uploadDriver.js';
+import { useCloudinary, useGridfs, getUploadDriver } from '../uploadDriver.js';
 
 const topicUpload = () =>
   useCloudinary() || useGridfs() ? uploadTopicFilesMemory : uploadTopicFiles;
@@ -73,6 +73,11 @@ export function topicRoutes(baseUrl) {
 
   const admin = Router();
   admin.use(authRequired, loadUser, adminOnly);
+
+  /** Confirms which storage mode the server uses (no secrets). */
+  admin.get('/admin/upload-settings', (_req, res) => {
+    res.json({ uploadDriver: getUploadDriver() });
+  });
 
   admin.get('/admin/topics', async (_req, res, next) => {
     try {

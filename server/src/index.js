@@ -33,13 +33,16 @@ async function main() {
   ensureUploadsDir();
 
   const uploadDriver = getUploadDriver();
+  console.log(`[uploads] UPLOAD_DRIVER=${uploadDriver}`);
   if (uploadDriver === 'cloudinary') {
     configureCloudinary();
-    console.log('[uploads] Cloudinary — new admin uploads go to CDN (check pdfRemoteUrl in MongoDB).');
+    console.log('[uploads] Cloudinary active — new admin uploads use pdfRemoteUrl / audioRemoteUrl in MongoDB.');
   } else if (uploadDriver === 'gridfs') {
-    console.log('[uploads] GridFS — new uploads store pdfFileId / audioFileId in MongoDB.');
+    console.log('[uploads] GridFS — pdfFileId / audioFileId in MongoDB.');
   } else {
-    console.log('[uploads] Local disk — MongoDB will show pdfFilename / audioFilename (not Cloudinary).');
+    console.warn(
+      '[uploads] Local disk (default). Cloudinary API keys alone do not enable CDN — set UPLOAD_DRIVER=cloudinary on Render and redeploy.'
+    );
   }
 
   const app = express();
