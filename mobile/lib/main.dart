@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 
-import 'services/api_client.dart';
 import 'screens/topics_screen.dart';
+import 'services/api_client.dart';
+import 'theme/app_theme.dart' show AppColors, buildMedStudyTheme;
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -31,13 +32,13 @@ class _MedStudyAppState extends State<MedStudyApp> {
     if (t != null && t.isNotEmpty) {
       try {
         final u = await _api.me();
-        setState(() => _user = u);
+        if (mounted) setState(() => _user = u);
       } catch (_) {
         await ApiClient.saveToken(null);
-        setState(() => _user = null);
+        if (mounted) setState(() => _user = null);
       }
     }
-    setState(() => _boot = false);
+    if (mounted) setState(() => _boot = false);
   }
 
   void _onAuthChanged() {
@@ -48,12 +49,14 @@ class _MedStudyAppState extends State<MedStudyApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'MedStudy',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF00897B)),
-        useMaterial3: true,
-      ),
+      theme: buildMedStudyTheme(),
+      themeMode: ThemeMode.dark,
+      debugShowCheckedModeBanner: false,
       home: _boot
-          ? const Scaffold(body: Center(child: CircularProgressIndicator()))
+          ? const Scaffold(
+              backgroundColor: AppColors.bgBase,
+              body: Center(child: CircularProgressIndicator()),
+            )
           : TopicsScreen(
               api: _api,
               user: _user,

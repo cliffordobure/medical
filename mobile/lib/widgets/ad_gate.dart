@@ -2,12 +2,15 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../theme/app_theme.dart';
+
 const int kAdSeconds = 30;
 
 Future<void> showAdGate(BuildContext context, {String title = 'Sponsored'}) {
   return showDialog<void>(
     context: context,
     barrierDismissible: false,
+    barrierColor: Colors.black.withValues(alpha: 0.75),
     builder: (ctx) => _AdGateDialog(title: title),
   );
 }
@@ -48,7 +51,11 @@ class _AdGateDialogState extends State<_AdGateDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text(widget.title),
+      backgroundColor: AppColors.bgCard,
+      title: Text(
+        widget.title,
+        style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w800),
+      ),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -58,21 +65,24 @@ class _AdGateDialogState extends State<_AdGateDialog> {
             alignment: Alignment.center,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(12),
-              gradient: const LinearGradient(
-                colors: [Color(0xFFE0F2F1), Color(0xFFB2DFDB)],
+              gradient: LinearGradient(
+                colors: [
+                  AppColors.spotifyGreen.withValues(alpha: 0.35),
+                  AppColors.bgHighlight,
+                ],
               ),
             ),
             child: const Text(
               'Demo ad\nReplace with your ad network',
               textAlign: TextAlign.center,
-              style: TextStyle(color: Color(0xFF00695C)),
+              style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.w600),
             ),
           ),
           const SizedBox(height: 16),
           Text(
             'Continue in $_left s or skip now',
             textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodyMedium,
+            style: const TextStyle(color: AppColors.textMuted),
           ),
         ],
       ),

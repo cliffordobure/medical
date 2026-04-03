@@ -52,15 +52,26 @@ function audioFilter(_req, file, cb) {
   }
 }
 
+const multerFields = [
+  { name: 'pdf', maxCount: 1 },
+  { name: 'audio', maxCount: 1 },
+];
+
+const fileFilter = (req, file, cb) => {
+  if (file.fieldname === 'pdf') return pdfFilter(req, file, cb);
+  if (file.fieldname === 'audio') return audioFilter(req, file, cb);
+  cb(new Error('Unexpected field'));
+};
+
 export const uploadTopicFiles = multer({
   storage,
   limits: { fileSize: 80 * 1024 * 1024 },
-  fileFilter: (req, file, cb) => {
-    if (file.fieldname === 'pdf') return pdfFilter(req, file, cb);
-    if (file.fieldname === 'audio') return audioFilter(req, file, cb);
-    cb(new Error('Unexpected field'));
-  },
-}).fields([
-  { name: 'pdf', maxCount: 1 },
-  { name: 'audio', maxCount: 1 },
-]);
+  fileFilter,
+}).fields(multerFields);
+
+/** For UPLOAD_DRIVER=gridfs — files in memory then stored in MongoDB GridFS */
+export const uploadTopicFilesMemory = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 80 * 1024 * 1024 },
+  fileFilter,
+}).fields(multerFields);

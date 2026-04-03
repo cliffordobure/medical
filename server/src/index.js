@@ -3,7 +3,9 @@ import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import mongoose from 'mongoose';
 import { connectDb } from './db.js';
+import { openDownloadStream, BUCKET_PDFS, BUCKET_AUDIO } from './gridfsStorage.js';
 import { authRouter } from './routes/authRoutes.js';
 import { topicRoutes } from './routes/topicRoutes.js';
 import { paymentRouter, paystackWebhookHandler } from './routes/paymentRoutes.js';
@@ -12,6 +14,8 @@ import { runSeed } from './seed.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT) || 5000;
+/** Bind to all interfaces so Android emulator (10.0.2.2) and phones on LAN can reach the API. */
+const LISTEN_HOST = process.env.LISTEN_HOST || '0.0.0.0';
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/medical_students';
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || 'http://localhost:5173';
 const API_PUBLIC_URL = (process.env.API_PUBLIC_URL || `http://localhost:${PORT}`).replace(/\/$/, '');
@@ -25,6 +29,13 @@ async function main() {
   await connectDb(MONGODB_URI);
   await runSeed();
   ensureUploadsDir();
+
+  const uploadDriver = process.env.UPLOAD_DRIVER || 'disk';
+  if (uploadDriver === 'gridfs') {
+    console.log('File storage: MongoDB GridFS (survives Render restarts — re-upload old disk-only PDFs once).');
+  } else {
+    console.log('File storage: local disk (uploads/ — not persistent on Render without a disk mount).');
+  }
 
   const app = express();
   const corsOrigin =
@@ -41,14 +52,52 @@ async function main() {
   app.use(express.json({ limit: '2mb' }));
 
   const uploadsPath = path.join(__dirname, '../uploads');
-  app.use(
-    '/uploads',
-    (_req, res, next) => {
+  const staticFileCors = (req, res, next) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Length, Content-Range, Accept-Ranges');
+    if (req.method === 'OPTIONS') return res.sendStatus(204);
+    next();
+  };
+  app.use('/uploads', staticFileCors, express.static(uploadsPath));
+
+  async function streamGridFile(res, bucketName, id, contentType) {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      res.status(400).send('Invalid file id');
+      return;
+    }
+    try {
+      const oid = new mongoose.Types.ObjectId(id);
+      const filesColl = mongoose.connection.db.collection(`${bucketName}.files`);
+      const meta = await filesColl.findOne({ _id: oid });
+      if (!meta) {
+        res.status(404).send('File not found');
+        return;
+      }
+      if (Number.isFinite(meta.length)) {
+        res.setHeader('Content-Length', String(meta.length));
+      }
+      const stream = openDownloadStream(bucketName, id);
+      res.setHeader('Content-Type', contentType);
+      res.setHeader('Accept-Ranges', 'bytes');
       res.setHeader('Access-Control-Allow-Origin', '*');
-      next();
-    },
-    express.static(uploadsPath)
-  );
+      res.setHeader('Access-Control-Expose-Headers', 'Content-Length, Content-Range, Accept-Ranges');
+      stream.on('error', () => {
+        if (!res.headersSent) res.status(404).send('File not found');
+      });
+      stream.pipe(res);
+    } catch {
+      if (!res.headersSent) res.status(404).send('File not found');
+    }
+  }
+
+  app.options('/api/files/pdfs/:id', staticFileCors, (_req, res) => res.sendStatus(204));
+  app.options('/api/files/audio/:id', staticFileCors, (_req, res) => res.sendStatus(204));
+  app.get('/api/files/pdfs/:id', staticFileCors, (req, res, next) => {
+    streamGridFile(res, BUCKET_PDFS, req.params.id, 'application/pdf').catch(next);
+  });
+  app.get('/api/files/audio/:id', staticFileCors, (req, res, next) => {
+    streamGridFile(res, BUCKET_AUDIO, req.params.id, 'application/octet-stream').catch(next);
+  });
 
   app.use('/api/auth', authRouter);
   app.use('/api', topicRoutes(API_PUBLIC_URL));
@@ -67,8 +116,9 @@ async function main() {
     res.status(500).json({ error: 'Internal server error' });
   });
 
-  app.listen(PORT, () => {
-    console.log(`API listening on http://localhost:${PORT}`);
+  app.listen(PORT, LISTEN_HOST, () => {
+    console.log(`API on port ${PORT} (${LISTEN_HOST}) — local: http://localhost:${PORT}`);
+    console.log(`Android emulator: http://10.0.2.2:${PORT}  |  LAN: use this PC IP + port`);
     console.log(`Public base URL for files: ${API_PUBLIC_URL}`);
   });
 }

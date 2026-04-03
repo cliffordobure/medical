@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Document, Page, pdfjs } from 'react-pdf'
 import { AdInterstitial } from './AdInterstitial'
 import 'react-pdf/dist/Page/AnnotationLayer.css'
@@ -19,6 +19,11 @@ export function PdfWithAds({ url, premium }: Props) {
   const [page, setPage] = useState(1)
   const [adOpen, setAdOpen] = useState(false)
   const [blockedPage, setBlockedPage] = useState<number | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
+
+  useEffect(() => {
+    setLoadError(null)
+  }, [url])
 
   const onLoadSuccess = useCallback(({ numPages: n }: { numPages: number }) => {
     setNumPages(n)
@@ -83,8 +88,19 @@ export function PdfWithAds({ url, premium }: Props) {
         <Document
           file={url}
           onLoadSuccess={onLoadSuccess}
+          onLoadError={(err) => {
+            console.error(err)
+            setLoadError(
+              err instanceof Error ? err.message : 'Failed to load PDF (network, 404, or CORS).'
+            )
+          }}
           loading={<p className="p-4 text-sm text-slate-500">Loading PDF…</p>}
-          error={<p className="p-4 text-sm text-red-600">Could not load PDF.</p>}
+          error={
+            <p className="p-4 text-sm text-red-600">
+              {loadError ||
+                'Could not load PDF. On Render: use UPLOAD_DRIVER=gridfs and re-upload, or the file was lost after a restart.'}
+            </p>
+          }
         >
           <Page
             pageNumber={page}

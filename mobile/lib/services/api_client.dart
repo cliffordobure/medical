@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
@@ -7,8 +8,19 @@ import '../config.dart';
 
 const _tokenKey = 'medstudy_token';
 
+BaseOptions _baseOptions() {
+  return BaseOptions(
+    baseUrl: AppConfig.apiPrefix,
+    // Render free tier cold start often needs 30–90s before accepting connections
+    connectTimeout: const Duration(seconds: 60),
+    receiveTimeout: const Duration(seconds: 45),
+    sendTimeout: const Duration(seconds: 45),
+    headers: {'Accept': 'application/json'},
+  );
+}
+
 class ApiClient {
-  ApiClient() : dio = Dio(BaseOptions(baseUrl: AppConfig.apiPrefix)) {
+  ApiClient() : dio = Dio(_baseOptions()) {
     dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
@@ -36,6 +48,29 @@ class ApiClient {
     } else {
       await p.setString(_tokenKey, token);
     }
+  }
+
+  /// User-facing hint when requests fail (same base as [AppConfig.apiBase]).
+  static String connectionHint(Object? error) {
+    final base = AppConfig.apiBase;
+    if (error is DioException) {
+      switch (error.type) {
+        case DioExceptionType.connectionTimeout:
+        case DioExceptionType.sendTimeout:
+        case DioExceptionType.receiveTimeout:
+          return 'Timed out reaching $base. Is the server running and port open?';
+        case DioExceptionType.connectionError:
+          return 'Cannot reach $base.\n'
+              '• Emulator: host should be 10.0.2.2 (default).\n'
+              '• Real phone: use your computer\'s Wi‑Fi IP, e.g.\n'
+              '  flutter run --dart-define=API_BASE=http://192.168.x.x:5000';
+        case DioExceptionType.badResponse:
+          return 'Server error (${error.response?.statusCode ?? '?'}).';
+        default:
+          break;
+      }
+    }
+    return 'Could not load data. API: $base';
   }
 
   Future<List<dynamic>> fetchTopics() async {
@@ -78,11 +113,69 @@ class ApiClient {
     return Map<String, dynamic>.from(r.data as Map);
   }
 
-  Future<Uint8List> downloadBytes(String absoluteUrl) async {
-    final r = await Dio().get<List<int>>(
-      absoluteUrl,
-      options: Options(responseType: ResponseType.bytes),
+  /// Wakes a sleeping host (e.g. Render) with a tiny request before a large PDF download.
+  static Future<void> pokeHealthEndpoint() async {
+    final uri = Uri.parse('${AppConfig.apiBase}/api/health');
+    final d = Dio(
+      BaseOptions(
+        connectTimeout: const Duration(seconds: 150),
+        receiveTimeout: const Duration(seconds: 90),
+        responseType: ResponseType.json,
+      ),
     );
-    return Uint8List.fromList(r.data ?? []);
+    try {
+      await d.getUri(uri).timeout(const Duration(seconds: 180));
+    } catch (_) {
+      /* ignore — best-effort wake */
+    }
+  }
+
+  /// [onProgress] receives (bytesReceived, totalBytesOrNull).
+  ///
+  /// Uses a hard wall-clock timeout so we never hang forever if the server never sends body bytes
+  /// (Dio `receiveTimeout` alone may not fire until the first chunk).
+  Future<Uint8List> downloadBytes(
+    String absoluteUrl, {
+    void Function(int received, int? total)? onProgress,
+  }) async {
+    final d = Dio(
+      BaseOptions(
+        connectTimeout: const Duration(seconds: 150),
+        receiveTimeout: const Duration(seconds: 90),
+        responseType: ResponseType.bytes,
+      ),
+    );
+
+    for (var attempt = 0; attempt < 3; attempt++) {
+      if (attempt > 0) {
+        await Future<void>.delayed(Duration(seconds: 2 * attempt));
+      }
+      try {
+        final r = await d
+            .get<List<int>>(
+              absoluteUrl,
+              onReceiveProgress: (c, t) {
+                final total = t == -1 ? null : t;
+                onProgress?.call(c, total);
+              },
+            )
+            .timeout(
+              const Duration(minutes: 15),
+              onTimeout: () => throw TimeoutException(
+                'PDF download exceeded 15 minutes',
+                const Duration(minutes: 15),
+              ),
+            );
+        return Uint8List.fromList(r.data ?? []);
+      } on TimeoutException {
+        rethrow;
+      } on DioException catch (e) {
+        final retry = e.type == DioExceptionType.connectionTimeout ||
+            e.type == DioExceptionType.receiveTimeout ||
+            e.type == DioExceptionType.connectionError;
+        if (!retry || attempt == 2) rethrow;
+      }
+    }
+    throw StateError('downloadBytes: unreachable');
   }
 }

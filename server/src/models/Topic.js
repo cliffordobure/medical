@@ -6,7 +6,10 @@ const topicSchema = new mongoose.Schema(
     description: { type: String, default: '' },
     slug: { type: String, required: true, unique: true, lowercase: true, trim: true },
     pdfFilename: { type: String, default: null },
+    /** GridFS file id (hex) when UPLOAD_DRIVER=gridfs */
+    pdfFileId: { type: String, default: null },
     audioFilename: { type: String, default: null },
+    audioFileId: { type: String, default: null },
     sortOrder: { type: Number, default: 0 },
     isPublished: { type: Boolean, default: false },
   },
@@ -21,15 +24,23 @@ topicSchema.methods.toListJSON = function toListJSON(baseUrl) {
     slug: this.slug,
     sortOrder: this.sortOrder,
     isPublished: this.isPublished,
-    hasPdf: Boolean(this.pdfFilename),
-    hasAudio: Boolean(this.audioFilename),
+    hasPdf: Boolean(this.pdfFilename || this.pdfFileId),
+    hasAudio: Boolean(this.audioFilename || this.audioFileId),
     updatedAt: this.updatedAt,
   };
 };
 
 topicSchema.methods.toDetailJSON = function toDetailJSON(baseUrl) {
-  const pdfUrl = this.pdfFilename ? `${baseUrl}/uploads/${this.pdfFilename}` : null;
-  const audioUrl = this.audioFilename ? `${baseUrl}/uploads/${this.audioFilename}` : null;
+  const pdfUrl = this.pdfFileId
+    ? `${baseUrl}/api/files/pdfs/${this.pdfFileId}`
+    : this.pdfFilename
+      ? `${baseUrl}/uploads/${this.pdfFilename}`
+      : null;
+  const audioUrl = this.audioFileId
+    ? `${baseUrl}/api/files/audio/${this.audioFileId}`
+    : this.audioFilename
+      ? `${baseUrl}/uploads/${this.audioFilename}`
+      : null;
   return {
     ...this.toListJSON(baseUrl),
     pdfUrl,

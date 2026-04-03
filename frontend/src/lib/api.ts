@@ -1,7 +1,14 @@
 import axios from 'axios'
 
+/** Public origin of the Express API, no trailing slash (e.g. https://api.example.com). Set in frontend/.env as VITE_API_URL. */
+function apiBasePath(): string {
+  const raw = import.meta.env.VITE_API_URL?.trim()
+  if (raw) return `${raw.replace(/\/$/, '')}/api`
+  return '/api'
+}
+
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: apiBasePath(),
   headers: { 'Content-Type': 'application/json' },
 })
 

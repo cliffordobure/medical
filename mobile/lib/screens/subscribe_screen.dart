@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../services/api_client.dart';
+import '../theme/app_theme.dart';
 
 class SubscribeScreen extends StatefulWidget {
   const SubscribeScreen({super.key, required this.api, this.onDone});
@@ -64,7 +65,9 @@ class _SubscribeScreenState extends State<SubscribeScreen> {
       if (!mounted) return;
       widget.onDone?.call();
       Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Premium activated')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Premium activated')),
+      );
     } catch (_) {
       setState(() => _error = 'Verification failed. Check reference.');
     }
@@ -73,45 +76,142 @@ class _SubscribeScreenState extends State<SubscribeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Premium')),
+      backgroundColor: AppColors.bgBase,
+      appBar: AppBar(
+        title: const Text('Premium'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : ListView(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(20),
               children: [
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    gradient: LinearGradient(
+                      colors: [
+                        AppColors.spotifyGreen.withValues(alpha: 0.25),
+                        AppColors.bgCard,
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                  ),
+                  child: const Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.workspace_premium_rounded, color: AppColors.spotifyGreen, size: 36),
+                      SizedBox(height: 12),
+                      Text(
+                        'Study without interruptions',
+                        style: TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 22,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: -0.5,
+                        ),
+                      ),
+                      SizedBox(height: 8),
+                      Text(
+                        'Remove ads on PDFs and audio. Pay securely with Paystack.',
+                        style: TextStyle(color: AppColors.textSecondary, height: 1.4),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
                 const Text(
-                  'Pay with Paystack in the browser. After paying, paste the transaction reference here to verify '
-                  '(or rely on the webhook + refresh).',
+                  'Pay in the browser, then verify with your reference if needed.',
+                  style: TextStyle(color: AppColors.textSecondary, height: 1.4),
                 ),
                 if (_error != null) ...[
-                  const SizedBox(height: 12),
-                  Text(_error!, style: const TextStyle(color: Colors.red)),
+                  const SizedBox(height: 16),
+                  Text(_error!, style: const TextStyle(color: AppColors.error)),
                 ],
-                const SizedBox(height: 16),
+                const SizedBox(height: 20),
                 ..._packages.map((p) {
                   final m = p as Map<String, dynamic>;
                   final kobo = (m['amountKobo'] as num).toInt();
-                  return Card(
-                    child: ListTile(
-                      title: Text(m['displayName'] as String? ?? ''),
-                      subtitle: Text('₦${(kobo / 100).toStringAsFixed(0)}'),
-                      trailing: const Icon(Icons.payment),
-                      onTap: () => _pay(m),
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Material(
+                      color: AppColors.bgCard,
+                      borderRadius: BorderRadius.circular(14),
+                      clipBehavior: Clip.antiAlias,
+                      child: InkWell(
+                        onTap: () => _pay(m),
+                        child: Padding(
+                          padding: const EdgeInsets.all(18),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: AppColors.spotifyGreen.withValues(alpha: 0.2),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.payment_rounded, color: AppColors.spotifyGreen),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      m['displayName'] as String? ?? '',
+                                      style: const TextStyle(
+                                        color: AppColors.textPrimary,
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      '₦${(kobo / 100).toStringAsFixed(0)}',
+                                      style: const TextStyle(
+                                        color: AppColors.spotifyGreen,
+                                        fontWeight: FontWeight.w900,
+                                        fontSize: 18,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
+                            ],
+                          ),
+                        ),
+                      ),
                     ),
                   );
                 }),
-                const SizedBox(height: 24),
-                const Text('Verify payment'),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: _ref,
-                  decoration: const InputDecoration(
-                    hintText: 'Reference from Paystack',
-                    border: OutlineInputBorder(),
+                const SizedBox(height: 28),
+                const Text(
+                  'Verify payment',
+                  style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 16,
                   ),
                 ),
-                const SizedBox(height: 12),
-                FilledButton(onPressed: _verify, child: const Text('Verify reference')),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: _ref,
+                  style: const TextStyle(color: AppColors.textPrimary),
+                  decoration: const InputDecoration(
+                    hintText: 'Reference from Paystack',
+                  ),
+                ),
+                const SizedBox(height: 16),
+                FilledButton(
+                  onPressed: _verify,
+                  child: const Text('VERIFY REFERENCE'),
+                ),
               ],
             ),
     );

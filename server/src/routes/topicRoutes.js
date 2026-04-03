@@ -2,7 +2,16 @@ import { Router } from 'express';
 import { slugify } from '../utils/slugify.js';
 import { Topic } from '../models/Topic.js';
 import { authRequired, loadUser, adminOnly } from '../middleware/auth.js';
-import { uploadTopicFiles } from '../middleware/upload.js';
+import { uploadTopicFiles, uploadTopicFilesMemory } from '../middleware/upload.js';
+import {
+  uploadBufferToGridFS,
+  deleteGridFile,
+  BUCKET_PDFS,
+  BUCKET_AUDIO,
+} from '../gridfsStorage.js';
+
+const useGridfs = () => process.env.UPLOAD_DRIVER === 'gridfs';
+const topicUpload = () => (useGridfs() ? uploadTopicFilesMemory : uploadTopicFiles);
 
 export function topicRoutes(baseUrl) {
   const router = Router();
@@ -38,7 +47,7 @@ export function topicRoutes(baseUrl) {
     }
   });
 
-  admin.post('/admin/topics', uploadTopicFiles, async (req, res, next) => {
+  admin.post('/admin/topics', topicUpload(), async (req, res, next) => {
     try {
       const { title, description, isPublished, sortOrder } = req.body || {};
       if (!title) return res.status(400).json({ error: 'Title is required' });
@@ -46,6 +55,32 @@ export function topicRoutes(baseUrl) {
       const pdfFile = files.pdf?.[0];
       if (!pdfFile) return res.status(400).json({ error: 'PDF file is required' });
       const audioFile = files.audio?.[0];
+
+      let pdfFilename = null;
+      let pdfFileId = null;
+      let audioFilename = null;
+      let audioFileId = null;
+
+      if (useGridfs()) {
+        pdfFileId = await uploadBufferToGridFS(
+          BUCKET_PDFS,
+          pdfFile.buffer,
+          pdfFile.originalname,
+          pdfFile.mimetype || 'application/pdf'
+        );
+        if (audioFile) {
+          audioFileId = await uploadBufferToGridFS(
+            BUCKET_AUDIO,
+            audioFile.buffer,
+            audioFile.originalname,
+            audioFile.mimetype || 'audio/mpeg'
+          );
+        }
+      } else {
+        pdfFilename = pdfFile.filename;
+        if (audioFile) audioFilename = audioFile.filename;
+      }
+
       let slug = slugify(title);
       let n = 0;
       while (await Topic.findOne({ slug })) {
@@ -56,8 +91,10 @@ export function topicRoutes(baseUrl) {
         title: String(title).trim(),
         description: String(description || ''),
         slug,
-        pdfFilename: pdfFile.filename,
-        audioFilename: audioFile?.filename || null,
+        pdfFilename,
+        pdfFileId,
+        audioFilename,
+        audioFileId,
         sortOrder: sortOrder != null ? Number(sortOrder) : 0,
         isPublished: isPublished === 'true' || isPublished === true,
       });
@@ -67,7 +104,7 @@ export function topicRoutes(baseUrl) {
     }
   });
 
-  admin.patch('/admin/topics/:id', uploadTopicFiles, async (req, res, next) => {
+  admin.patch('/admin/topics/:id', topicUpload(), async (req, res, next) => {
     try {
       const topic = await Topic.findById(req.params.id);
       if (!topic) return res.status(404).json({ error: 'Topic not found' });
@@ -79,12 +116,44 @@ export function topicRoutes(baseUrl) {
         topic.isPublished = isPublished === 'true' || isPublished === true;
       }
       const files = req.files || {};
-      if (files.pdf?.[0]) topic.pdfFilename = files.pdf[0].filename;
-      if (files.audio?.[0]) topic.audioFilename = files.audio[0].filename;
+
+      if (files.pdf?.[0]) {
+        const p = files.pdf[0];
+        if (topic.pdfFileId) await deleteGridFile(BUCKET_PDFS, topic.pdfFileId);
+        if (useGridfs()) {
+          topic.pdfFileId = await uploadBufferToGridFS(
+            BUCKET_PDFS,
+            p.buffer,
+            p.originalname,
+            p.mimetype || 'application/pdf'
+          );
+          topic.pdfFilename = null;
+        } else {
+          topic.pdfFilename = p.filename;
+          topic.pdfFileId = null;
+        }
+      }
+      if (files.audio?.[0]) {
+        const a = files.audio[0];
+        if (topic.audioFileId) await deleteGridFile(BUCKET_AUDIO, topic.audioFileId);
+        if (useGridfs()) {
+          topic.audioFileId = await uploadBufferToGridFS(
+            BUCKET_AUDIO,
+            a.buffer,
+            a.originalname,
+            a.mimetype || 'audio/mpeg'
+          );
+          topic.audioFilename = null;
+        } else {
+          topic.audioFilename = a.filename;
+          topic.audioFileId = null;
+        }
+      }
+
       if (title != null) {
-        let slug = slugify(topic.title);
-        const existing = await Topic.findOne({ slug, _id: { $ne: topic._id } });
-        if (!existing) topic.slug = slug;
+        const newSlug = slugify(topic.title);
+        const existing = await Topic.findOne({ slug: newSlug, _id: { $ne: topic._id } });
+        if (!existing) topic.slug = newSlug;
       }
       await topic.save();
       res.json({ topic: topic.toDetailJSON(baseUrl) });
@@ -95,8 +164,11 @@ export function topicRoutes(baseUrl) {
 
   admin.delete('/admin/topics/:id', async (req, res, next) => {
     try {
-      const topic = await Topic.findByIdAndDelete(req.params.id);
+      const topic = await Topic.findById(req.params.id);
       if (!topic) return res.status(404).json({ error: 'Topic not found' });
+      await deleteGridFile(BUCKET_PDFS, topic.pdfFileId);
+      await deleteGridFile(BUCKET_AUDIO, topic.audioFileId);
+      await topic.deleteOne();
       res.status(204).send();
     } catch (e) {
       next(e);
