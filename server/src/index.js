@@ -122,6 +122,48 @@ async function main() {
   app.use('/api', adminPackageRoutes());
   app.use('/api', paymentRouter(CLIENT_ORIGIN));
 
+  /**
+   * Paystack browser redirect after payment (mobile app opens Chrome here).
+   * Must be HTTPS + public — never localhost. Override with PAYSTACK_CALLBACK_URL if you host the SPA elsewhere.
+   */
+  app.get('/payment/return', (req, res) => {
+    const refRaw = req.query.reference || req.query.trxref || '';
+    const ref = String(refRaw).slice(0, 200);
+    const safe = ref.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-store');
+    res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Payment — Medical Audios</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      background: #121212; color: #e8e8e8; display: flex; align-items: center; justify-content: center; padding: 24px; }
+    .card { max-width: 420px; width: 100%; background: #1e1e1e; border-radius: 16px; padding: 28px 24px;
+      box-shadow: 0 8px 32px rgba(0,0,0,.4); text-align: center; }
+    h1 { font-size: 1.35rem; margin: 0 0 12px; color: #fff; }
+    p { margin: 0 0 16px; line-height: 1.5; color: #b3b3b3; font-size: 0.95rem; }
+    .ok { color: #1db954; font-weight: 700; margin-bottom: 8px; }
+    code { display: block; margin-top: 12px; padding: 12px; background: #2a2a2a; border-radius: 10px;
+      font-size: 0.8rem; word-break: break-all; color: #ddd; }
+    .hint { font-size: 0.85rem; margin-top: 20px; color: #888; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <p class="ok">Payment completed</p>
+    <h1>Return to Medical Audios</h1>
+    <p>You can close this browser tab. Premium usually activates within a minute. If ads are still on, open the app → Premium → paste your reference below.</p>
+    ${ref ? `<p style="margin-bottom:8px;font-size:0.8rem;color:#888;">Reference</p><code>${safe}</code>` : '<p>No reference in the URL — check your Paystack email or app.</p>'}
+    <p class="hint">This page is served from your API so it works on real phones (not localhost).</p>
+  </div>
+</body>
+</html>`);
+  });
+
   app.get('/api/health', (_req, res) =>
     res.json({
       ok: true,
@@ -148,6 +190,7 @@ async function main() {
   app.listen(PORT, LISTEN_HOST, () => {
     console.log(`API listening on ${LISTEN_HOST}:${PORT}`);
     console.log(`Public base URL for PDF/audio/ad links: ${API_PUBLIC_URL}`);
+    console.log(`Paystack redirect (default if PAYSTACK_CALLBACK_URL unset): ${API_PUBLIC_URL}/payment/return`);
   });
 }
 

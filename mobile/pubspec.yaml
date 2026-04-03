@@ -1,5 +1,5 @@
 name: medical_students_app
-description: "A new Flutter project."
+description: "Medical Audios — PDF notes and audio for medical students."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -45,6 +45,8 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  flutter_launcher_icons: ^0.14.3
+  flutter_native_splash: ^2.4.4
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is
@@ -94,3 +96,26 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+  assets:
+    - assets/branding/
+
+# App icon: dart run flutter_launcher_icons
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: assets/branding/app_icon.png
+  min_sdk_android: 21
+  adaptive_icon_background: "#121212"
+  adaptive_icon_foreground: assets/branding/ic_foreground.png
+
+# Splash: dart run flutter_native_splash:create
+flutter_native_splash:
+  color: "#121212"
+  image: assets/branding/splash_logo.png
+  android_gravity: center
+  ios_content_mode: center
+  web: false
+  android_12:
+    color: "#121212"
+    image: assets/branding/splash_logo.png

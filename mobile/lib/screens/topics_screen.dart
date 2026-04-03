@@ -159,6 +159,7 @@ class _TopicsScreenState extends State<TopicsScreen> {
                     api: widget.api,
                     slug: slug,
                     premium: premium,
+                    user: widget.user,
                     onPremiumChanged: widget.onAuthChanged,
                   ),
                 ),
@@ -175,7 +176,7 @@ class _TopicsScreenState extends State<TopicsScreen> {
     await Navigator.push<void>(
       context,
       MaterialPageRoute(
-        builder: (_) => SubscribeScreen(api: widget.api, onDone: widget.onAuthChanged),
+        builder: (_) => SubscribeScreen(api: widget.api, user: widget.user, onDone: widget.onAuthChanged),
       ),
     );
     widget.onAuthChanged();
@@ -423,6 +424,7 @@ class _TopicsScreenState extends State<TopicsScreen> {
                           api: widget.api,
                           slug: slug,
                           premium: premium,
+                          user: widget.user,
                           onPremiumChanged: widget.onAuthChanged,
                         ),
                       ),

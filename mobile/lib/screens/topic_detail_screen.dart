@@ -20,12 +20,14 @@ class TopicDetailScreen extends StatefulWidget {
     required this.api,
     required this.slug,
     required this.premium,
+    this.user,
     this.onPremiumChanged,
   });
 
   final ApiClient api;
   final String slug;
   final bool premium;
+  final Map<String, dynamic>? user;
   final VoidCallback? onPremiumChanged;
 
   @override
@@ -168,6 +170,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
               api: widget.api,
               pdfUrl: resolveMediaUrl(pdfUrl),
               premium: widget.premium,
+              user: widget.user,
               onPremiumChanged: widget.onPremiumChanged,
             ),
             _AudioPane(
@@ -175,6 +178,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
               audioUrl: resolveMediaUrl(audioUrl),
               premium: widget.premium,
               title: title,
+              user: widget.user,
               onPremiumChanged: widget.onPremiumChanged,
             ),
           ],
@@ -189,12 +193,14 @@ class _PdfPane extends StatefulWidget {
     required this.api,
     required this.pdfUrl,
     required this.premium,
+    this.user,
     this.onPremiumChanged,
   });
 
   final ApiClient api;
   final String? pdfUrl;
   final bool premium;
+  final Map<String, dynamic>? user;
   final VoidCallback? onPremiumChanged;
 
   @override
@@ -293,6 +299,7 @@ class _PdfPaneState extends State<_PdfPane> {
                     MaterialPageRoute(
                       builder: (_) => SubscribeScreen(
                         api: widget.api,
+                        user: widget.user,
                         onDone: widget.onPremiumChanged,
                       ),
                     ),
@@ -431,6 +438,7 @@ class _AudioPane extends StatefulWidget {
     required this.audioUrl,
     required this.premium,
     required this.title,
+    this.user,
     this.onPremiumChanged,
   });
 
@@ -438,6 +446,7 @@ class _AudioPane extends StatefulWidget {
   final String? audioUrl;
   final bool premium;
   final String title;
+  final Map<String, dynamic>? user;
   final VoidCallback? onPremiumChanged;
 
   @override
@@ -522,6 +531,7 @@ class _AudioPaneState extends State<_AudioPane> {
           MaterialPageRoute(
             builder: (_) => SubscribeScreen(
               api: widget.api,
+              user: widget.user,
               onDone: widget.onPremiumChanged,
             ),
           ),

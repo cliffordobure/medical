@@ -89,7 +89,12 @@ export function paymentRouter(clientOrigin) {
       const email = req.user.email;
       const currency = paystackCurrency();
       const callbackOverride = (process.env.PAYSTACK_CALLBACK_URL || '').trim();
-      const callbackUrl = callbackOverride || `${String(clientOrigin).replace(/\/$/, '')}/subscribe/callback`;
+      const apiPublic = (process.env.API_PUBLIC_URL || '').replace(/\/$/, '');
+      const callbackUrl =
+        callbackOverride ||
+        (apiPublic
+          ? `${apiPublic}/payment/return`
+          : `${String(clientOrigin).replace(/\/$/, '')}/subscribe/callback`);
       const reference = `ms_${req.user._id}_${Date.now()}`;
 
       const init = await paystackRequest('/transaction/initialize', 'POST', {

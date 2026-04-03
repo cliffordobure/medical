@@ -4,11 +4,14 @@ import 'package:url_launcher/url_launcher.dart';
 import '../config.dart';
 import '../services/api_client.dart';
 import '../theme/app_theme.dart';
+import 'login_screen.dart';
 
 class SubscribeScreen extends StatefulWidget {
-  const SubscribeScreen({super.key, required this.api, this.onDone});
+  const SubscribeScreen({super.key, required this.api, this.user, this.onDone});
 
   final ApiClient api;
+  /// When set, used to block non-student accounts before calling Paystack.
+  final Map<String, dynamic>? user;
   final VoidCallback? onDone;
 
   @override
@@ -69,7 +72,66 @@ class _SubscribeScreenState extends State<SubscribeScreen> {
     }
   }
 
+  Future<bool?> _showSignInDialog() {
+    return showDialog<bool>(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.bgCard,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          'Sign in to continue',
+          style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w800, fontSize: 20),
+        ),
+        content: const Text(
+          'Payments use your student account. Log in or create one, then you can pay with Paystack.',
+          style: TextStyle(color: AppColors.textSecondary, height: 1.45, fontSize: 14),
+        ),
+        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Not now', style: TextStyle(color: AppColors.textMuted, fontWeight: FontWeight.w600)),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Log in or register'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Returns true when the user may call payment APIs (has token + student when [user] is known).
+  Future<bool> _ensureAuthenticatedForPayment() async {
+    final token = await ApiClient.getToken();
+    if (token != null && token.isNotEmpty) {
+      if (widget.user != null && widget.user!['role'] != 'student') {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Only student accounts can purchase Premium. Sign in with a student account.'),
+            ),
+          );
+        }
+        return false;
+      }
+      return true;
+    }
+    if (!mounted) return false;
+    final go = await _showSignInDialog();
+    if (go != true || !mounted) return false;
+    final ok = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => LoginScreen(api: widget.api)),
+    );
+    if (ok != true || !mounted) return false;
+    widget.onDone?.call();
+    return true;
+  }
+
   Future<void> _pay(Map<String, dynamic> pkg) async {
+    if (!await _ensureAuthenticatedForPayment()) return;
     setState(() => _error = null);
     try {
       final init = await widget.api.initializePayment(pkg['id'] as String);
@@ -88,6 +150,7 @@ class _SubscribeScreenState extends State<SubscribeScreen> {
   }
 
   Future<void> _verify() async {
+    if (!await _ensureAuthenticatedForPayment()) return;
     final r = _ref.text.trim();
     if (r.isEmpty) return;
     setState(() => _error = null);
